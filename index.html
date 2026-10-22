@@ -133,7 +133,25 @@ tr.clickable{cursor:pointer}
 tr.clickable:hover td{background:var(--sunk)}
 tr.cur td{background:var(--accent-soft)}
 .mini{font-size:11px;padding:3px 8px}
-.bottom{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+.bottom{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:24px;align-items:start}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.drop{display:flex;flex-direction:column;gap:4px;align-items:center;text-align:center;padding:22px 14px;border:1.5px dashed var(--line);border-radius:var(--r);background:var(--sunk);cursor:pointer;color:var(--ink);margin:0}
+.drop b{font-size:14px}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+#fileIn:focus-visible + .drop{outline:2px solid var(--accent);outline-offset:1px}
+.catrow{display:flex;gap:6px;align-items:flex-end}
+.catrow .grow{flex:1;min-width:0}
+.catrow .btn{flex:none;padding-block:8px}
+.btn.danger{border-color:var(--warn);color:var(--warn)}
+.btn.armed{background:var(--warn);border-color:var(--warn);color:var(--surface)}
+.tree{display:flex;flex-direction:column;gap:2px}
+.tree button{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;font-size:13px;color:var(--ink);background:none;border:0;border-radius:7px;padding:7px 10px;cursor:pointer}
+.tree button:hover{background:var(--sunk)}
+.tree button[aria-pressed=true]{background:var(--accent-soft);font-weight:600}
+.tree .lv1{font-weight:600;margin-top:6px}
+.tree .lv2{padding-left:24px;color:var(--muted)}
+.tree .lv2[aria-pressed=true]{color:var(--ink)}
+.tree .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 @media (max-width:960px){.bottom{grid-template-columns:minmax(0,1fr)}}
 .cat{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--sunk)}
 .cat-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -158,7 +176,7 @@ tr.cur td{background:var(--accent-soft)}
   <header class="top">
     <div>
       <h1>영상 지표 진단실</h1>
-      <p class="sub">YouTube 스튜디오 표를 붙여넣거나 숫자를 입력하면 노출부터 구독까지 6단계로 나눠 병목 구간과 잘된 부분을 계산</p>
+      <p class="sub">YouTube 스튜디오에서 내보낸 CSV를 넣거나 숫자를 입력하면 노출부터 구독까지 6단계로 나눠 병목 구간과 잘된 부분을 계산</p>
     </div>
     <div class="backup">
       <div class="status-line"><span class="dot" id="dbDot"></span><span id="dbState">저장소 확인 중</span></div>
@@ -171,16 +189,12 @@ tr.cur td{background:var(--accent-soft)}
   <div class="grid">
     <!-- 입력 -->
     <aside class="panel" aria-label="지표 입력">
-      <h2>1. 지표 가져오기</h2>
-      <div>
-        <label for="pasteBox">스튜디오 표 붙여넣기 (CSV·복사한 표·"항목 값" 줄 모두 가능)</label>
-        <textarea id="pasteBox" placeholder="동영상 제목	노출수	노출 클릭률 (%)	조회수	평균 시청 지속 시간 ...&#10;금리 뉴스 읽는 법	18400	6.8	1520	0:03:48 ..."></textarea>
-      </div>
-      <div class="row">
-        <button class="btn primary" id="importBtn" type="button">표 읽기</button>
-        <span class="btn file-btn">CSV 파일 열기<input type="file" id="fileIn" accept=".csv,.tsv,.txt,text/csv"></span>
-      </div>
-      <p class="hint">스튜디오 → 분석 → 고급 모드 → 내보내기(CSV), 또는 표를 드래그해 복사. 여러 영상이 담긴 표는 한 번에 인식</p>
+      <h2>1. CSV 파일 넣기</h2>
+      <input type="file" id="fileIn" class="sr-only" accept=".csv,.tsv,.txt,text/csv">
+      <label class="drop" id="dropZone" for="fileIn">
+        <b>CSV 파일을 끌어다 놓거나 눌러서 선택</b>
+        <span class="hint">스튜디오 → 분석 → 고급 모드 → 내보내기 → CSV. 내려받은 압축 파일 안의 '표 데이터.csv'. 여러 영상이 담긴 파일은 한 번에 인식</span>
+      </label>
       <div id="importMsg" hidden></div>
       <div class="picklist" id="pickList" hidden></div>
       <div class="row" id="pickActions" hidden><button class="btn" id="saveAllBtn" type="button">인식된 영상 모두 저장</button></div>
@@ -188,9 +202,19 @@ tr.cur td{background:var(--accent-soft)}
       <hr class="divider">
       <h2>2. 영상 정보·지표 확인</h2>
       <div class="fields">
-        <div><label for="f-channel">채널</label><select id="f-channel"></select></div>
-        <div><label for="f-series">시리즈</label><select id="f-series"></select></div>
-        <p class="hint full" style="margin-top:-4px">목록에 없는 채널·시리즈는 아래 '채널·시리즈 관리'에서 추가</p>
+        <div class="full catrow">
+          <div class="grow"><label for="f-channel">채널</label><select id="f-channel"></select></div>
+          <button class="btn mini" id="chAddToggle" type="button">+ 추가</button>
+          <button class="btn mini danger" id="chDel" type="button">삭제</button>
+        </div>
+        <div class="full addrow" id="chAddRow" hidden><input type="text" id="chNew" placeholder="새 채널 이름" autocomplete="off"><button class="btn mini primary" id="chAddBtn" type="button">추가</button><button class="btn mini" id="chAddCancel" type="button">취소</button></div>
+        <div class="full catrow">
+          <div class="grow"><label for="f-series">시리즈</label><select id="f-series"></select></div>
+          <button class="btn mini" id="seAddToggle" type="button">+ 추가</button>
+          <button class="btn mini danger" id="seDel" type="button">삭제</button>
+        </div>
+        <div class="full addrow" id="seAddRow" hidden><input type="text" id="seNew" placeholder="새 시리즈 이름" autocomplete="off"><button class="btn mini primary" id="seAddBtn" type="button">추가</button><button class="btn mini" id="seAddCancel" type="button">취소</button></div>
+        <div class="full" id="catMsg" hidden></div>
         <div class="full"><label for="f-title">영상 제목</label><input type="text" id="f-title"></div>
         <div class="full"><label for="f-url">영상 링크</label><input type="url" id="f-url" placeholder="https://youtu.be/..."></div>
         <div class="full">
@@ -226,22 +250,14 @@ tr.cur td{background:var(--accent-soft)}
   </div>
 
   <div class="bottom">
-  <section class="panel" aria-label="채널·시리즈 관리">
-    <h2>채널·시리즈 관리</h2>
-    <p class="hint">여기 등록한 채널·시리즈가 입력 칸과 기록 필터에 표시. 삭제해도 저장된 영상 기록은 그대로 유지</p>
-    <div class="addrow"><input type="text" id="newChannel" placeholder="새 채널 이름" autocomplete="off"><button class="btn" id="addChannelBtn" type="button">채널 추가</button></div>
-    <div id="catList" style="display:flex;flex-direction:column;gap:10px"></div>
-    <div id="catMsg" hidden></div>
-  </section>
+  <nav class="panel" aria-label="카테고리">
+    <h2>카테고리</h2>
+    <div class="tree" id="catTree"></div>
+    <p class="hint">채널·시리즈 추가와 삭제는 위 '2. 영상 정보·지표 확인'에서</p>
+  </nav>
 
   <section class="panel" aria-label="저장 기록">
-    <div class="row" style="justify-content:space-between">
-      <h2>저장한 영상</h2>
-      <div class="row">
-        <label for="histFilter" style="margin:0">채널</label><select id="histFilter" style="width:auto"></select>
-        <label for="histSeries" style="margin:0">시리즈</label><select id="histSeries" style="width:auto"></select>
-      </div>
-    </div>
+    <h2 id="histTitle">저장한 영상</h2>
     <div class="sum" id="histSum" hidden></div>
     <p class="hint">같은 채널(또는 시리즈) 영상이 3편 이상 쌓이면 그 평균과 비교해 판정 보정. 행을 누르면 해당 영상 진단</p>
     <div class="tbl-wrap"><table id="histTbl"></table></div>
@@ -250,7 +266,7 @@ tr.cur td{background:var(--accent-soft)}
 
   <footer class="foot">
     <span>입력한 지표와 기록은 서버로 보내지 않고 이 브라우저에만 저장. 기기를 옮길 때는 "기록 내보내기 → 불러오기" 사용</span>
-    <span>v1.1</span>
+    <span>v1.2</span>
   </footer>
 </div>
 
@@ -553,26 +569,11 @@ function renderCatSelects(){
   const ss = ch ? seriesOf(ch) : [];
   $('#f-series').innerHTML = `<option value="">시리즈 없음</option>` + ss.map(s => `<option value="${esc(s)}"${s === state.cur.series ? ' selected' : ''}>${esc(s)}</option>`).join('');
   $('#f-series').disabled = !ch;
+  catControls();
 }
 const canEditCats = () => !state.db || state.canWrite;
 const countVideos = (ch, s) => state.history.filter(h => h.channel === ch && (s == null || h.series === s)).length;
-function renderCatManager(){
-  const el = $('#catList'), ed = canEditCats();
-  $('#newChannel').parentElement.hidden = !ed;
-  if (!state.cats.length){ el.innerHTML = `<p class="empty" style="margin:0">등록한 채널 없음.${ed ? ' 위 칸에 채널 이름을 넣고 "채널 추가"' : ''}</p>`; return; }
-  el.innerHTML = state.cats.map((c, ci) => {
-    const armC = state.catArm === 'c' + ci;
-    return `<div class="cat">
-    <div class="cat-head"><b>${esc(c.name)}</b><span class="row"><span class="cnt">${countVideos(c.name)}편</span>${ed ? `<button class="btn mini" data-delch="${ci}" type="button">${armC ? '삭제 확인' : '채널 삭제'}</button>` : ''}</span></div>
-    <div class="chips">${c.series.length ? c.series.map((s, si) => {
-      const arm = state.catArm === `s${ci}:${si}`;
-      return `<span class="schip">${esc(s)} <span class="cnt">${countVideos(c.name, s)}</span>${ed ? `<button type="button" data-delse="${ci}:${si}" class="${arm ? 'arm' : ''}" aria-label="${esc(s)} 시리즈 삭제">${arm ? '삭제' : '×'}</button>` : ''}</span>`;
-    }).join('') : '<span class="empty">시리즈 없음</span>'}</div>
-    ${ed ? `<div class="addrow"><input type="text" id="ns-${ci}" placeholder="새 시리즈 이름" autocomplete="off"><button class="btn mini" data-addse="${ci}" type="button">시리즈 추가</button></div>` : ''}
-  </div>`;
-  }).join('');
-}
-function refreshCats(){ renderCatManager(); renderCatSelects(); renderHistory(); }
+function refreshCats(){ renderCatSelects(); renderHistory(); }
 let catChain = Promise.resolve();
 function saveCats(next){
   const prev = state.cats;
@@ -584,40 +585,99 @@ function saveCats(next){
   });
 }
 const cloneCats = () => state.cats.map(c => ({name:c.name, series:[...c.series]}));
+function treeChannels(){
+  const names = state.cats.map(c => c.name);
+  state.history.forEach(h => { if (h.channel && !names.includes(h.channel)) names.push(h.channel); });
+  return names;
+}
+function renderCatTree(){
+  const fc = state.filterCh, fs = state.filterSe;
+  const btn = (cls, ch, se, label, n) => `<button type="button" class="${cls}" data-ch="${esc(ch)}" data-se="${esc(se)}" aria-pressed="${fc === ch && fs === se}"><span class="nm">${esc(label)}</span><span class="cnt">${n}</span></button>`;
+  let html = btn('', '', '', '전체 영상', state.history.length);
+  const chans = treeChannels();
+  if (!chans.length) html += '<p class="empty" style="margin:8px 10px 0">등록한 채널 없음</p>';
+  for (const ch of chans){
+    html += btn('lv1', ch, '', ch, countVideos(ch));
+    const ss = seriesOf(ch);
+    for (const se of ss) html += btn('lv2', ch, se, se, countVideos(ch, se));
+    const none = state.history.filter(h => h.channel === ch && !h.series).length;
+    if (none && ss.length) html += btn('lv2', ch, '__none', '시리즈 미지정', none);
+  }
+  $('#catTree').innerHTML = html;
+}
+$('#catTree').addEventListener('click', e => {
+  const b = e.target.closest('[data-ch]'); if (!b) return;
+  state.filterCh = b.dataset.ch; state.filterSe = b.dataset.se; renderHistory();
+});
+
+// 2번 칸의 채널·시리즈 추가·삭제
+function catControls(){
+  const ed = canEditCats(), ch = $('#f-channel').value, se = $('#f-series').value;
+  const c = state.cats.find(x => x.name === ch);
+  const regSe = !!c && c.series.includes(se);
+  $('#chAddToggle').hidden = $('#seAddToggle').hidden = !ed;
+  $('#chDel').hidden = !ed || !c;
+  $('#seDel').hidden = !ed || !regSe;
+  $('#seAddToggle').disabled = !ch;
+  $('#chDel').textContent = state.catArm === 'ch' ? '삭제 확인' : '삭제';
+  $('#seDel').textContent = state.catArm === 'se' ? '삭제 확인' : '삭제';
+  $('#chDel').classList.toggle('armed', state.catArm === 'ch');
+  $('#seDel').classList.toggle('armed', state.catArm === 'se');
+}
+function toggleAdd(kind, open){
+  $('#' + kind + 'AddRow').hidden = !open;
+  if (open){ $('#' + kind + 'New').value = ''; $('#' + kind + 'New').focus(); }
+}
 function addChannel(){
-  const inp = $('#newChannel'), name = inp.value.trim();
+  const name = $('#chNew').value.trim();
   if (!name) return;
   if (state.cats.some(c => c.name === name)){ showMsg('#catMsg', `"${name}" 채널은 이미 있음`, true); return; }
   const next = cloneCats(); next.push({name, series:[]});
-  inp.value = ''; $('#catMsg').hidden = true; saveCats(next);
+  $('#catMsg').hidden = true; toggleAdd('ch', false);
+  state.cur = {...readForm(), channel:name, series:''}; state.isExample = false;
+  saveCats(next); render();
 }
-function addSeries(ci){
-  const inp = $('#ns-' + ci), name = inp ? inp.value.trim() : '';
-  if (!name) return;
-  if (state.cats[ci].series.includes(name)){ showMsg('#catMsg', `"${name}" 시리즈는 이미 있음`, true); return; }
-  const next = cloneCats(); next[ci].series.push(name);
-  $('#catMsg').hidden = true; saveCats(next);
-  setTimeout(() => $('#ns-' + ci)?.focus(), 0);
+function addSeries(){
+  const ch = $('#f-channel').value, name = $('#seNew').value.trim();
+  if (!ch || !name) return;
+  const next = cloneCats();
+  let c = next.find(x => x.name === ch);
+  if (!c){ c = {name:ch, series:[]}; next.push(c); }
+  if (c.series.includes(name)){ showMsg('#catMsg', `"${name}" 시리즈는 이미 있음`, true); return; }
+  c.series.push(name);
+  $('#catMsg').hidden = true; toggleAdd('se', false);
+  state.cur = {...readForm(), series:name}; state.isExample = false;
+  saveCats(next); render();
 }
-$('#addChannelBtn').addEventListener('click', addChannel);
-$('#newChannel').addEventListener('keydown', e => { if (e.key === 'Enter') addChannel(); });
-$('#catList').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id?.startsWith('ns-')) addSeries(+e.target.id.slice(3)); });
-$('#catList').addEventListener('click', e => {
-  const add = e.target.closest('[data-addse]');
-  if (add){ addSeries(+add.dataset.addse); return; }
-  const dc = e.target.closest('[data-delch]');
-  if (dc){
-    const ci = +dc.dataset.delch;
-    if (state.catArm !== 'c' + ci){ state.catArm = 'c' + ci; renderCatManager(); return; }
-    state.catArm = null; const next = cloneCats(); next.splice(ci, 1); saveCats(next); return;
-  }
-  const ds = e.target.closest('[data-delse]');
-  if (ds){
-    const [ci, si] = ds.dataset.delse.split(':').map(Number);
-    if (state.catArm !== `s${ci}:${si}`){ state.catArm = `s${ci}:${si}`; renderCatManager(); return; }
-    state.catArm = null; const next = cloneCats(); next[ci].series.splice(si, 1); saveCats(next);
-  }
-});
+function delChannel(){
+  const ch = $('#f-channel').value;
+  if (state.catArm !== 'ch'){ state.catArm = 'ch'; catControls(); return; }
+  state.catArm = null;
+  const left = countVideos(ch);
+  state.cur = {...readForm(), channel:'', series:''};
+  saveCats(cloneCats().filter(c => c.name !== ch)); render();
+  showMsg('#catMsg', left ? `"${ch}" 목록에서 삭제. 저장된 영상 ${left}편이 남아 있어 목록에 계속 표시. 영상까지 지우려면 하단 기록에서 삭제` : `"${ch}" 채널 삭제`);
+}
+function delSeries(){
+  const ch = $('#f-channel').value, se = $('#f-series').value;
+  if (state.catArm !== 'se'){ state.catArm = 'se'; catControls(); return; }
+  state.catArm = null;
+  const left = countVideos(ch, se);
+  const next = cloneCats(); const c = next.find(x => x.name === ch); if (c) c.series = c.series.filter(x => x !== se);
+  state.cur = {...readForm(), series:''};
+  saveCats(next); render();
+  showMsg('#catMsg', left ? `"${se}" 목록에서 삭제. 저장된 영상 ${left}편이 남아 있어 목록에 계속 표시` : `"${se}" 시리즈 삭제`);
+}
+$('#chAddToggle').addEventListener('click', () => toggleAdd('ch', $('#chAddRow').hidden));
+$('#seAddToggle').addEventListener('click', () => toggleAdd('se', $('#seAddRow').hidden));
+$('#chAddCancel').addEventListener('click', () => toggleAdd('ch', false));
+$('#seAddCancel').addEventListener('click', () => toggleAdd('se', false));
+$('#chAddBtn').addEventListener('click', addChannel);
+$('#seAddBtn').addEventListener('click', addSeries);
+$('#chNew').addEventListener('keydown', e => { if (e.key === 'Enter') addChannel(); if (e.key === 'Escape') toggleAdd('ch', false); });
+$('#seNew').addEventListener('keydown', e => { if (e.key === 'Enter') addSeries(); if (e.key === 'Escape') toggleAdd('se', false); });
+$('#chDel').addEventListener('click', delChannel);
+$('#seDel').addEventListener('click', delSeries);
 
 /* ---------- 폼 ---------- */
 function buildForm(){
@@ -750,15 +810,10 @@ function render(){
 
 /* ---------- 기록 ---------- */
 function renderHistory(){
-  const chans = allChannels().filter(c => c !== '예시 채널' || state.history.some(h => h.channel === c));
-  if (state.filterCh && !chans.includes(state.filterCh)) state.filterCh = '';
-  const wantCh = state.filterCh;
-  $('#histFilter').innerHTML = `<option value="">전체</option>` + chans.map(c => `<option value="${esc(c)}"${c === wantCh ? ' selected' : ''}>${esc(c)}</option>`).join('');
-  const ss = wantCh ? seriesOf(wantCh) : [];
-  if (state.filterSe && state.filterSe !== '__none' && !ss.includes(state.filterSe)) state.filterSe = '';
-  const wantSe = state.filterSe;
-  $('#histSeries').innerHTML = `<option value="">전체</option>` + ss.map(s => `<option value="${esc(s)}"${s === wantSe ? ' selected' : ''}>${esc(s)}</option>`).join('') + (wantCh ? `<option value="__none"${wantSe === '__none' ? ' selected' : ''}>시리즈 미지정</option>` : '');
-  $('#histSeries').disabled = !wantCh;
+  if (state.filterCh && !treeChannels().includes(state.filterCh)){ state.filterCh = ''; state.filterSe = ''; }
+  const wantCh = state.filterCh, wantSe = state.filterSe;
+  renderCatTree();
+  $('#histTitle').textContent = '저장한 영상' + (wantCh ? ' · ' + wantCh + (wantSe ? ' › ' + (wantSe === '__none' ? '시리즈 미지정' : wantSe) : '') : '');
   const list = state.history.filter(h => (!wantCh || h.channel === wantCh) && (!wantSe || (wantSe === '__none' ? !h.series : h.series === wantSe)));
   const tbl = $('#histTbl'), sum = $('#histSum');
   sum.hidden = true;
@@ -800,8 +855,6 @@ $('#histTbl').addEventListener('click', async e => {
   fillForm(state.cur); render();
   window.scrollTo({top:0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
 });
-$('#histFilter').addEventListener('change', e => { state.filterCh = e.target.value; state.filterSe = ''; renderHistory(); });
-$('#histSeries').addEventListener('change', e => { state.filterSe = e.target.value; renderHistory(); });
 $('#verdict').addEventListener('click', e => { const b = e.target.closest('[data-basis]'); if (b){ state.basis = b.dataset.basis; render(); } });
 
 function showMsg(sel, text, err){ const el = $(sel); el.hidden = false; el.className = 'msg' + (err ? ' err' : ''); el.textContent = text; }
@@ -835,7 +888,7 @@ $('#newBtn').addEventListener('click', () => {
 function applyImported(vids){
   state.parsed = vids;
   const pl = $('#pickList');
-  if (!vids.length){ showMsg('#importMsg', '지표를 찾지 못함. 첫 줄에 "조회수", "노출수" 같은 항목 이름이 있는지 확인', true); pl.hidden = true; $('#pickActions').hidden = true; return; }
+  if (!vids.length){ showMsg('#importMsg', '지표를 찾지 못함. 스튜디오 "표 데이터.csv"인지, 첫 줄에 "조회수", "노출수" 같은 항목 이름이 있는지 확인', true); pl.hidden = true; $('#pickActions').hidden = true; return; }
   showMsg('#importMsg', vids.length === 1 ? '영상 1편 인식. 아래 칸에 채움' : `영상 ${vids.length}편 인식. 진단할 영상 선택`);
   pl.hidden = vids.length < 2;
   $('#pickActions').hidden = !(state.db && state.canWrite);
@@ -856,14 +909,19 @@ function pick(i){
   fillForm(merged); render();
 }
 $('#pickList').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) pick(+b.dataset.i); });
-$('#importBtn').addEventListener('click', () => { const t = $('#pasteBox').value; if (!t.trim()){ showMsg('#importMsg', '붙여넣은 내용 없음', true); return; } applyImported(importText(t)); });
-$('#fileIn').addEventListener('change', e => {
-  const f = e.target.files[0]; if (!f) return;
+function readCsv(f){
+  if (!f) return;
+  if (!/\.(csv|tsv|txt)$/i.test(f.name)){ showMsg('#importMsg', 'CSV 파일만 가능. 스튜디오에서 받은 압축 파일은 풀어서 "표 데이터.csv"를 넣기', true); return; }
   const rd = new FileReader();
-  rd.onload = () => { let t = String(rd.result); $('#pasteBox').value = t.slice(0, 20000); applyImported(importText(t)); };
+  rd.onload = () => applyImported(importText(String(rd.result)));
+  rd.onerror = () => showMsg('#importMsg', '파일을 읽지 못함', true);
   rd.readAsText(f, 'utf-8');
-  e.target.value = '';
-});
+}
+$('#fileIn').addEventListener('change', e => { readCsv(e.target.files[0]); e.target.value = ''; });
+const dz = $('#dropZone');
+['dragenter','dragover'].forEach(t => dz.addEventListener(t, e => { e.preventDefault(); dz.classList.add('over'); }));
+['dragleave','drop'].forEach(t => dz.addEventListener(t, () => dz.classList.remove('over')));
+dz.addEventListener('drop', e => { e.preventDefault(); readCsv(e.dataTransfer.files[0]); });
 $('#saveAllBtn').addEventListener('click', async () => {
   const ch = $('#f-channel').value, se = $('#f-series').value;
   if (!ch){ showMsg('#importMsg', '먼저 아래 "채널" 칸에서 채널 선택 (시리즈도 고르면 함께 저장)', true); $('#f-channel').focus(); return; }
@@ -963,14 +1021,13 @@ $('#importJson').addEventListener('change', e => {
 /* ---------- 시작 ---------- */
 buildForm();
 ['#f-title','#f-url'].forEach(s => $(s).addEventListener('input', onFormInput));
-$('#f-channel').addEventListener('change', () => { state.cur = {...readForm(), series:''}; state.isExample = false; renderCatSelects(); render(); });
-$('#f-series').addEventListener('change', () => { state.cur = readForm(); state.isExample = false; render(); });
+$('#f-channel').addEventListener('change', () => { state.catArm = null; toggleAdd('se', false); state.cur = {...readForm(), series:''}; state.isExample = false; renderCatSelects(); render(); });
+$('#f-series').addEventListener('change', () => { state.catArm = null; catControls(); state.cur = readForm(); state.isExample = false; render(); });
 FORM.forEach(f => $('#f-'+f.k).addEventListener('input', onFormInput));
 $('#fmtLong').addEventListener('click', () => { setFormat('long'); state.isExample = false; });
 $('#fmtShorts').addEventListener('click', () => { setFormat('shorts'); state.isExample = false; });
 fillForm(state.cur);
 render();
-renderCatManager();
 
 {
   const db = makeLocalDb();
@@ -981,7 +1038,7 @@ renderCatManager();
   };
   db.collection('videos').orderBy('savedAt','desc').limit(500).onSnapshot(snap => {
     state.history = snap.docs.map(doc => ({id:doc.id, ...doc.data()}));
-    renderCatManager(); renderCatSelects(); render(); setStatus();
+    renderCatSelects(); render(); setStatus();
   });
   db.doc('meta/categories').onSnapshot(snap => {
     const raw = snap.exists ? snap.data().channels : [];
