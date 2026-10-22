@@ -185,6 +185,29 @@ tr.cur td{background:var(--accent-soft)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--good-soft);border-left:3px solid var(--good)}
 .legend i.bad{background:var(--warn-soft);border-left-color:var(--warn)}
 .legend i.empty{background:var(--ok-soft);border-left-color:var(--ok)}
+.period-btn{width:100%;display:flex;justify-content:space-between;align-items:center;gap:8px;font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:7px;padding:8px 10px;cursor:pointer;text-align:left}
+.period-btn[aria-expanded=true]{border-color:var(--accent)}
+.period-btn .pinfo{font-size:12px;color:var(--accent);font-weight:600;flex:none}
+.rp{margin-top:8px;border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+.rp-presets{display:flex;flex-wrap:wrap;gap:6px}
+.rp-presets button{font:inherit;font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);background:var(--sunk);color:var(--ink);cursor:pointer}
+.rp-presets button:disabled{opacity:.45;cursor:default}
+.rp-head{display:flex;justify-content:space-between;align-items:center}
+.rp-head b{font-size:14px}
+.rp-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));row-gap:2px;text-align:center}
+.rp-grid .dw{font-size:11px;color:var(--muted);padding:4px 0}
+.rp-grid button{font:inherit;font-size:12px;padding:7px 0;border:0;background:none;color:var(--ink);cursor:pointer;position:relative}
+.rp-grid button:hover:not(:disabled){background:var(--sunk)}
+.rp-grid button:disabled{color:var(--muted);opacity:.4;cursor:default}
+.rp-grid button.in{background:var(--accent-soft)}
+.rp-grid button.st,.rp-grid button.en{background:var(--accent);color:var(--accent-ink);font-weight:700}
+.rp-grid button.st{border-radius:7px 0 0 7px}
+.rp-grid button.en{border-radius:0 7px 7px 0}
+.rp-grid button.st.en{border-radius:7px}
+.rp-grid button.pub::after{content:"";position:absolute;left:50%;bottom:2px;width:4px;height:4px;margin-left:-2px;border-radius:50%;background:var(--warn)}
+.rp-grid button.td{text-decoration:underline;text-underline-offset:3px}
+.rp-legend{font-size:11px;color:var(--muted)}
+.rp-legend i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-right:4px;vertical-align:1px}
 .backup{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
 @media (prefers-reduced-motion:no-preference){.stage,.verdict{transition:border-color .2s}}
 </style>
@@ -236,6 +259,17 @@ tr.cur td{background:var(--accent-soft)}
         <div class="full" id="catMsg" hidden></div>
         <div class="full"><label for="f-title">영상 제목</label><input type="text" id="f-title"></div>
         <div class="full"><label for="f-published">게시일</label><input type="date" id="f-published"></div>
+        <div class="full">
+          <label for="periodBtn">조회 기간 (스튜디오에서 내보낸 기간과 같게)</label>
+          <button type="button" class="period-btn" id="periodBtn" aria-expanded="false" aria-controls="rangePicker"><span id="periodText">기간 선택</span><span class="pinfo" id="periodInfo"></span></button>
+          <div class="rp" id="rangePicker" hidden>
+            <div class="rp-presets" id="rpPresets"></div>
+            <div class="rp-head"><button class="btn mini" type="button" data-rnav="-1" aria-label="이전 달">‹</button><b id="rpMonth"></b><button class="btn mini" type="button" data-rnav="1" aria-label="다음 달">›</button></div>
+            <div class="rp-grid" id="rpGrid"></div>
+            <p class="rp-legend"><i></i>게시일 · 시작일과 종료일을 차례로 누르기</p>
+            <div class="row" style="justify-content:flex-end"><button class="btn mini" id="rpClear" type="button">기간 지우기</button><button class="btn mini primary" id="rpDone" type="button">완료</button></div>
+          </div>
+        </div>
         <div class="full"><label for="f-url">영상 링크</label><input type="url" id="f-url" placeholder="https://youtu.be/..."></div>
         <div class="full">
           <label>형식</label>
@@ -261,6 +295,11 @@ tr.cur td{background:var(--accent-soft)}
         <div class="panel"><h2>문제점·개선 액션</h2><ul class="list issues" id="issues"></ul></div>
       </div>
       <div class="panel" id="notesPanel" hidden><h2>유입 경로 참고</h2><ul class="list notes" id="notes"></ul></div>
+      <div class="panel" id="tlPanel" hidden>
+        <h2>기간별 변화</h2>
+        <p class="hint">같은 영상을 조회 기간별로 저장한 기록. 행을 누르면 그 시점 기준으로 진단</p>
+        <div class="tbl-wrap"><table id="tlTbl"></table></div>
+      </div>
       <div class="panel">
         <h2>계산 지표</h2>
         <div class="tbl-wrap"><table id="calcTbl"></table></div>
@@ -292,7 +331,7 @@ tr.cur td{background:var(--accent-soft)}
 
   <footer class="foot">
     <span>입력한 지표와 기록은 서버로 보내지 않고 이 브라우저에만 저장. 기기를 옮길 때는 "기록 내보내기 → 불러오기" 사용</span>
-    <span>v1.4</span>
+    <span>v1.5</span>
   </footer>
 </div>
 
@@ -513,11 +552,52 @@ function judge(val, th, avg){
 const S_LABEL = {good:'좋음', ok:'보통', bad:'개선 필요', na:'비교 기준 없음', none:'데이터 없음'};
 const AVG_KEYS = ['impressions','views','ctr','ret30','avp','engRate','subsPer1k','likeRate','commentPer1k','sharePer1k','watchHours'];
 
-function channelAvg(channel, format, excludeId, series){
+/* ---------- 조회 기간 ---------- */
+const DAY_MS = 86400000;
+const dayDiff = (a, b) => Math.round((Date.parse(b + 'T00:00') - Date.parse(a + 'T00:00')) / DAY_MS);
+const addDays = (iso, n) => { const d = new Date(iso + 'T00:00'); d.setDate(d.getDate() + n); return localISO(d); };
+// 경과일 구간: 같은 구간끼리만 평균 비교
+const BUCKETS = [
+  {k:'d1', max:2, label:'1~2일'},
+  {k:'d7', max:10, label:'1주'},
+  {k:'d28', max:40, label:'4주'},
+  {k:'d90', max:120, label:'3개월'},
+  {k:'long', max:Infinity, label:'3개월 이상'},
+];
+function periodInfo(v){
+  const pub = toISODate(v.published), from = v.periodFrom || '', to = v.periodTo || '';
+  if (!to) return {key:'unknown', label:'조회 기간 미지정', scope:'기간 미지정'};
+  if (!from || (pub && from <= pub)){
+    if (!pub) return {key:'unknown', label:'게시일 미지정', scope:'기간 미지정'};
+    const age = dayDiff(pub, to) + 1;
+    if (age < 1) return {key:'invalid', label:'기간이 게시일보다 앞섬', scope:'비교 불가'};
+    const b = BUCKETS.find(x => age <= x.max);
+    return {key:'c:' + b.k, label:`게시 후 ${age}일`, scope:`게시 후 ${b.label}`, age};
+  }
+  const len = dayDiff(from, to) + 1;
+  const b = BUCKETS.find(x => len <= x.max);
+  return {key:'w:' + b.k, label:`${len}일 구간`, scope:`${b.label} 구간`, age: pub ? dayDiff(pub, to) + 1 : null};
+}
+const fmtMD = iso => iso ? iso.slice(5).replace('-', '.') : '';
+const fmtPeriod = v => v.periodTo ? `${v.periodFrom ? fmtMD(v.periodFrom) : '게시일'} ~ ${fmtMD(v.periodTo)}` : '';
+const snapKey = v => (v.periodFrom || 'start') + '_' + (v.periodTo || 'none');
+const PERIOD_KEYS = ['periodFrom','periodTo'];
+// 영상 한 편의 기간별 기록 (예전 기록은 한 건으로 취급)
+function snapsOf(h){
+  if (!h.snaps || !Object.keys(h.snaps).length) return [h];
+  const base = {...h}; delete base.snaps;
+  NUM_KEYS.filter(k => k !== 'durationSec').concat(PERIOD_KEYS).forEach(k => delete base[k]);  // 영상 길이는 공통 정보로 유지
+  return Object.values(h.snaps).map(sn => ({...base, ...sn})).sort((a, b) => (a.periodTo || '') < (b.periodTo || '') ? -1 : 1);
+}
+
+function channelAvg(channel, format, excludeId, series, key){
   if (!channel) return null;
-  const pool = state.history.filter(h => h.channel === channel && (!series || h.series === series) && (h.format||'long') === (format||'long') && h.id !== excludeId).map(derive);
+  const pool = state.history.filter(h => h.channel === channel && (!series || h.series === series) && (h.format||'long') === (format||'long') && h.id !== excludeId)
+    .map(h => { const m = snapsOf(h).filter(sn => !key || periodInfo(sn).key === key); return m[m.length - 1]; })
+    .filter(Boolean).map(derive);
   if (pool.length < 3) return null;
-  const avg = {_n: pool.length, _word: series ? '시리즈 평균' : '채널 평균', _scope: series ? `같은 시리즈 ${pool.length}편` : `같은 채널 ${pool.length}편`};
+  const sc = key ? periodInfo(pool[0]).scope : '';
+  const avg = {_n: pool.length, _word: series ? '시리즈 평균' : '채널 평균', _scope: (series ? '같은 시리즈' : '같은 채널') + (sc ? ` · ${sc} 기준` : '') + ` ${pool.length}편`};
   for (const k of AVG_KEYS){
     const xs = pool.map(p => p[k]).filter(x => x != null && isFinite(x));
     avg[k] = xs.length >= 3 ? xs.reduce((a,b) => a+b, 0) / xs.length : null;
@@ -582,8 +662,8 @@ function diagnose(d, avg){
 }
 
 /* ---------- 상태 ---------- */
-const EXAMPLE = {channel:'예시 채널', series:'예시 시리즈', title:'예시: 금리 뉴스 읽는 법', url:'', format:'long', durationSec:742, impressions:18400, ctr:6.8, views:1520, avdSec:228, ret30:58, subs:9, likes:61, comments:12, shares:7, tBrowse:34, tSuggested:21, tSearch:18};
-const state = {cur:{...EXAMPLE}, isExample:true, editingId:null, history:[], parsed:[], pickIdx:-1, db:null, canWrite:false, filterCh:'', filterSe:'', delArm:null, cats:[], catArm:null, basis:'series', basisWord:'채널 평균', view:'list', calMonth:''};
+const EXAMPLE = {channel:'예시 채널', series:'예시 시리즈', title:'예시: 금리 뉴스 읽는 법', url:'', format:'long', published:addDays(localISO(new Date()), -7), periodFrom:'', periodTo:localISO(new Date()), durationSec:742, impressions:18400, ctr:6.8, views:1520, avdSec:228, ret30:58, subs:9, likes:61, comments:12, shares:7, tBrowse:34, tSuggested:21, tSearch:18};
+const state = {cur:{...EXAMPLE}, isExample:true, editingId:null, history:[], parsed:[], pickIdx:-1, db:null, canWrite:false, filterCh:'', filterSe:'', delArm:null, cats:[], catArm:null, basis:'series', basisWord:'채널 평균', view:'list', calMonth:'', rp:{open:false, month:'', pick:null}, snapArm:null};
 state.calMonth = localISO(new Date()).slice(0, 7);
 
 /* ---------- 채널·시리즈 ---------- */
@@ -730,7 +810,7 @@ function fillForm(v){
   setFormat(v.format || 'long', false);
 }
 function readForm(){
-  const v = {channel:$('#f-channel').value, series:$('#f-series').value, title:$('#f-title').value.trim(), url:$('#f-url').value.trim(), format:state.cur.format || 'long', published:$('#f-published').value || null};
+  const v = {channel:$('#f-channel').value, series:$('#f-series').value, title:$('#f-title').value.trim(), url:$('#f-url').value.trim(), format:state.cur.format || 'long', published:$('#f-published').value || null, periodFrom:state.cur.periodFrom || '', periodTo:state.cur.periodTo || ''};
   FORM.forEach(f => { const raw = $('#f-'+f.k).value; const x = f.time ? parseTime(raw) : parseNum(raw); if (x != null) v[f.k] = x; });
   v.videoId = videoIdFrom(v.url) || state.cur.videoId || null;
   if (!v.url && v.videoId) v.url = 'https://youtu.be/' + v.videoId;
@@ -760,9 +840,11 @@ function relHtml(rel){
   return `<span class="delta ${p>0?'up':'down'}">${state.basisWord} 대비 ${p>0?'▲':'▼'} ${Math.abs(p)}%</span>`;
 }
 function render(){
+  renderPeriod();
   const d = derive(state.cur);
-  const chAvg = channelAvg(d.channel, d.format, state.editingId);
-  const seAvg = d.series ? channelAvg(d.channel, d.format, state.editingId, d.series) : null;
+  const pi = periodInfo(d);
+  const chAvg = channelAvg(d.channel, d.format, state.editingId, null, pi.key);
+  const seAvg = d.series ? channelAvg(d.channel, d.format, state.editingId, d.series, pi.key) : null;
   const avg = state.basis === 'series' && seAvg ? seAvg : chAvg;
   state.basisWord = avg ? avg._word : '채널 평균';
   const r = diagnose(d, avg);
@@ -783,9 +865,10 @@ function render(){
     <div class="meta">${state.isExample ? '<span class="tag ex">예시 데이터</span>' : ''}${state.editingId ? '<span class="tag">저장된 기록</span>' : ''}
       <span>${esc(d.channel || '채널 미지정')}${d.series ? ' › ' + esc(d.series) : ''} · ${d.format === 'shorts' ? '쇼츠' : '롱폼'}${d.durationSec ? ' · ' + fmtTime(d.durationSec) : ''}${link}</span></div>
     <div style="font-weight:600">${esc(d.title || '제목 없음')}</div>
+    <div class="meta"><span>${d.published ? '게시 ' + esc(toISODate(d.published) || d.published) : '게시일 미입력'}</span><span>${d.periodTo ? '조회 기간 ' + fmtPeriod(d) + ' · <b>' + esc(pi.label) + '</b> 시점' : '조회 기간 미지정 · 기간을 넣으면 경과일이 비슷한 영상끼리 비교'}</span></div>
     <p class="vt">${head}</p>
     <p>${body}</p>
-    <div class="meta"><span>좋음 ${good} · 개선 필요 ${bad} · 입력 ${filled}/${r.stages.length}단계</span><span>${avg ? `비교 기준: 일반 참고치 + ${avg._scope} 평균` : '비교 기준: 일반 참고치 (같은 채널·시리즈 3편 이상 저장 시 평균 반영)'}</span>
+    <div class="meta"><span>좋음 ${good} · 개선 필요 ${bad} · 입력 ${filled}/${r.stages.length}단계</span><span>${avg ? `비교 기준: 일반 참고치 + ${avg._scope} 평균` : `비교 기준: 일반 참고치 (같은 채널·시리즈${pi.key.startsWith('c:') || pi.key.startsWith('w:') ? ' · ' + pi.scope + ' 기준' : ''} 영상이 3편 이상이면 평균 반영)`}</span>
       ${chAvg && seAvg ? `<span class="seg sm" role="group" aria-label="비교 평균"><button type="button" data-basis="channel" aria-pressed="${avg === chAvg}">채널 평균</button><button type="button" data-basis="series" aria-pressed="${avg === seAvg}">시리즈 평균</button></span>` : ''}</div>`;
 
   // 깔때기
@@ -816,6 +899,7 @@ function render(){
   $('#goods').innerHTML = r.goods.length ? r.goods.map(li).join('') : '<li class="empty" style="display:block">아직 "좋음" 판정 단계 없음</li>';
   $('#issues').innerHTML = r.issues.length ? r.issues.map(li).join('') : '<li class="empty" style="display:block">"개선 필요" 판정 단계 없음</li>';
   $('#notesPanel').hidden = !r.notes.length;
+  renderTimeline();
   $('#notes').innerHTML = r.notes.map(li).join('');
 
   // 계산 지표
@@ -863,18 +947,18 @@ function renderHistory(){
   renderCalendar(list);
   if (!state.db){ tbl.innerHTML = '<tbody><tr><td class="txt">저장 기능을 쓸 수 없는 브라우저. 진단은 그대로 동작</td></tr></tbody>'; return; }
   if (!list.length){ tbl.innerHTML = `<tbody><tr><td class="txt">${state.history.length ? '이 조건에 맞는 영상 없음' : '저장한 영상 없음. 왼쪽에서 지표 입력 후 "기록 저장"을 누르면 여기에 쌓이고, 같은 채널 3편부터 평균 비교 시작'}</td></tr></tbody>`; return; }
-  const rowsD = list.map(h => { const d = derive(h); return {h, d, r: diagnose(d, channelAvg(h.channel, h.format, h.id))}; });
+  const rowsD = list.map(h => { const d = derive(h); return {h, d, r: diagnose(d, channelAvg(h.channel, h.format, h.id, null, periodInfo(h).key))}; });
   const mean = k => { const xs = rowsD.map(x => x.d[k]).filter(x => x != null && isFinite(x)); return xs.length ? xs.reduce((a,b) => a+b, 0) / xs.length : null; };
   const necks = {}; rowsD.forEach(x => { if (x.r.neck) necks[x.r.neck.name] = (necks[x.r.neck.name] || 0) + 1; });
   const topNeck = Object.entries(necks).sort((a,b) => b[1] - a[1])[0];
   const scope = wantCh ? esc(wantCh) + (wantSe ? ' › ' + (wantSe === '__none' ? '시리즈 미지정' : esc(wantSe)) : '') : '전체 채널';
   sum.hidden = false;
   sum.innerHTML = `<span>${scope} <b>${list.length}</b>편</span><span>평균 클릭률 <b>${pct1(mean('ctr'))}</b></span><span>초반 유지 <b>${pct0(mean('ret30'))}</b></span><span>조회율 <b>${pct1(mean('avp'))}</b></span><span>반응률 <b>${pct1(mean('engRate'))}</b></span><span>구독/1천 <b>${f1(mean('subsPer1k'))}</b></span><span>가장 잦은 병목 <b>${topNeck ? esc(topNeck[0]) + ' (' + topNeck[1] + '편)' : '없음'}</b></span>`;
-  tbl.innerHTML = `<thead><tr><th>제목</th><th>채널 › 시리즈</th><th>게시</th><th>노출</th><th>클릭률</th><th>초반 유지</th><th>조회율</th><th>반응률</th><th>구독/1천</th><th>병목</th><th></th></tr></thead><tbody>` +
+  tbl.innerHTML = `<thead><tr><th>제목</th><th>채널 › 시리즈</th><th>게시</th><th>기준</th><th>노출</th><th>클릭률</th><th>초반 유지</th><th>조회율</th><th>반응률</th><th>구독/1천</th><th>병목</th><th></th></tr></thead><tbody>` +
     rowsD.map(({h, d, r}) => {
       return `<tr class="clickable${h.id === state.editingId ? ' cur' : ''}" data-id="${esc(h.id)}">
         <td class="txt" title="${esc(h.title)}">${esc(h.title || '제목 없음')}${h.format === 'shorts' ? ' <span class="tag">쇼츠</span>' : ''}</td>
-        <td class="txt">${esc(h.channel || '–')}${h.series ? ' › ' + esc(h.series) : ''}</td><td class="txt">${esc(toISODate(h.published) || h.published || '–')}</td>
+        <td class="txt">${esc(h.channel || '–')}${h.series ? ' › ' + esc(h.series) : ''}</td><td class="txt">${esc(toISODate(h.published) || h.published || '–')}</td><td class="txt">${esc(periodInfo(h).label)}${h.snaps && Object.keys(h.snaps).length > 1 ? ` <span class="tag">${Object.keys(h.snaps).length}개 기간</span>` : ''}</td>
         <td>${f0(d.impressions)}</td><td>${pct1(d.ctr)}</td><td>${pct0(d.ret30)}</td><td>${pct1(d.avp)}</td><td>${pct1(d.engRate)}</td><td>${f1(d.subsPer1k)}</td>
         <td class="txt">${noMetrics(h) ? '<span class="chip s-none">지표 부족</span>' : r.neck ? `<span class="chip s-bad">${esc(r.neck.name)}</span>` : '<span class="chip s-good">없음</span>'}</td>
         <td>${state.canWrite ? `<button class="btn mini" data-del="${esc(h.id)}" type="button">${state.delArm === h.id ? '삭제 확인' : '삭제'}</button>` : ''}</td></tr>`;
@@ -898,7 +982,7 @@ const toTop = () => window.scrollTo({top:0, behavior: matchMedia('(prefers-reduc
 function loadVideo(id){
   const h = state.history.find(x => x.id === id);
   if (!h) return;
-  state.cur = {...h}; state.editingId = h.id; state.isExample = false; state.delArm = null;
+  state.cur = {...snapsOf(h).pop()}; delete state.cur.snaps; state.editingId = h.id; state.isExample = false; state.delArm = null; state.snapArm = null;
   fillForm(state.cur); render(); toTop();
 }
 
@@ -907,7 +991,7 @@ const todayISO = () => localISO(new Date());
 const noMetrics = h => h.views == null && h.impressions == null;
 function evStatus(h){
   if (noMetrics(h)) return 'empty';
-  return diagnose(derive(h), channelAvg(h.channel, h.format, h.id)).neck ? 'bad' : 'good';
+  return diagnose(derive(h), channelAvg(h.channel, h.format, h.id, null, periodInfo(h).key)).neck ? 'bad' : 'good';
 }
 function renderCalendar(list){
   const el = $('#calView');
@@ -943,7 +1027,7 @@ function renderCalendar(list){
 
   const stLabel = {good:'<span class="chip s-good">병목 없음</span>', bad:'', empty:'<span class="chip s-none">지표 부족</span>'};
   const rows = monthEvs.flatMap(([dt, evs]) => evs.map(e => {
-    const r = e.st === 'bad' ? diagnose(derive(e.h), channelAvg(e.h.channel, e.h.format, e.h.id)) : null;
+    const r = e.st === 'bad' ? diagnose(derive(e.h), channelAvg(e.h.channel, e.h.format, e.h.id, null, periodInfo(e.h).key)) : null;
     return `<tr class="clickable${e.h.id === state.editingId ? ' cur' : ''}" data-id="${esc(e.h.id)}"><td class="txt">${dt.slice(5).replace('-', '.')} (${'일월화수목금토'[new Date(dt + 'T00:00').getDay()]})</td><td class="txt" title="${esc(e.h.title)}">${esc(e.h.title || '제목 없음')}</td><td class="txt">${esc(e.h.channel || '–')}${e.h.series ? ' › ' + esc(e.h.series) : ''}</td><td class="txt">${e.st === 'bad' ? `<span class="chip s-bad">${esc(r.neck.name)}</span>` : stLabel[e.st]}</td></tr>`;
   })).join('');
 
@@ -976,15 +1060,30 @@ $('#verdict').addEventListener('click', e => { const b = e.target.closest('[data
 
 function showMsg(sel, text, err){ const el = $(sel); el.hidden = false; el.className = 'msg' + (err ? ' err' : ''); el.textContent = text; }
 
-function toDoc(v){
-  const o = {channel:v.channel || '', series:v.series || '', title:v.title || '', url:v.url || '', videoId:v.videoId || null, format:v.format || 'long', published:v.published || null, savedAt:Date.now()};
-  NUM_KEYS.forEach(k => { if (v[k] != null && isFinite(v[k])) o[k] = v[k]; });
+// 영상 문서 = 공통 정보 + 기간별 기록(snaps). 바깥 지표는 가장 최근 기간 값
+function buildDoc(base, snaps){
+  const o = {channel:base.channel || '', series:base.series || '', title:base.title || '', url:base.url || '', videoId:base.videoId || null, format:base.format || 'long', published:base.published || null, snaps};
+  const latest = Object.values(snaps).sort((a, b) => (a.periodTo || '') < (b.periodTo || '') ? -1 : 1).pop();
+  if (latest) Object.assign(o, latest);
+  o.savedAt = Date.now();
   return o;
+}
+function snapOf(v){
+  const sn = {periodFrom:v.periodFrom || '', periodTo:v.periodTo || '', savedAt:Date.now()};
+  NUM_KEYS.forEach(k => { if (v[k] != null && isFinite(v[k])) sn[k] = v[k]; });
+  return sn;
+}
+function toDoc(v, prev){
+  const snaps = {...(prev?.snaps || {})};
+  if (prev && !prev.snaps && NUM_KEYS.some(k => prev[k] != null)) snaps[snapKey(prev)] = snapOf(prev);
+  snaps[snapKey(v)] = snapOf(v);
+  return buildDoc(v, snaps);
 }
 async function saveOne(v, id){
   const col = state.db.collection('videos');
   const ref = id ? col.doc(id) : (v.videoId ? col.doc(v.videoId) : col.doc());
-  await ref.set(toDoc(v));
+  const prev = state.history.find(h => h.id === ref.id);
+  await ref.set(toDoc(v, prev));
   return ref.id;
 }
 $('#saveBtn').addEventListener('click', async () => {
@@ -992,13 +1091,109 @@ $('#saveBtn').addEventListener('click', async () => {
   const v = readForm();
   if (!v.channel){ showMsg('#saveMsg', '채널 선택 필요. 목록에 없으면 아래 "채널·시리즈 관리"에서 추가', true); $('#f-channel').focus(); return; }
   const btn = $('#saveBtn'); btn.disabled = true;
-  try { state.editingId = await saveOne(v, state.editingId); state.cur = {...v, id:state.editingId}; state.isExample = false; showMsg('#saveMsg', '저장됨: ' + (v.title || '제목 없음')); render(); }
+  try { state.editingId = await saveOne(v, state.editingId); state.cur = {...v, id:state.editingId}; state.isExample = false; showMsg('#saveMsg', '저장됨: ' + (v.title || '제목 없음') + (v.periodTo ? ` · ${periodInfo(v).label} 기록` : ' · 조회 기간 미지정')); render(); }
   catch (err){ showMsg('#saveMsg', '저장 실패: ' + (err.code === 'quota_exceeded' ? '저장 공간 가득 참. 오래된 기록 삭제 필요' : (err.message || err.code)), true); }
   finally { btn.disabled = false; }
 });
 $('#newBtn').addEventListener('click', () => {
-  state.cur = {channel:$('#f-channel').value, series:$('#f-series').value, format:state.cur.format || 'long'}; state.editingId = null; state.isExample = false;
+  state.cur = {channel:$('#f-channel').value, series:$('#f-series').value, format:state.cur.format || 'long', periodFrom:'', periodTo:todayISO()}; state.editingId = null; state.isExample = false;
   fillForm(state.cur); render(); $('#f-title').focus();
+});
+
+/* ---------- 조회 기간 선택 ---------- */
+const PRESETS = [
+  {id:'l7', label:'지난 7일', f:() => [addDays(todayISO(), -6), todayISO()]},
+  {id:'l28', label:'지난 28일', f:() => [addDays(todayISO(), -27), todayISO()]},
+  {id:'l90', label:'지난 90일', f:() => [addDays(todayISO(), -89), todayISO()]},
+  {id:'l365', label:'지난 365일', f:() => [addDays(todayISO(), -364), todayISO()]},
+  {id:'all', label:'전체 기간', f:() => ['', todayISO()]},
+  {id:'p7', label:'게시 후 7일', pub:true, f:pub => [pub, minISO(addDays(pub, 6), todayISO())]},
+  {id:'p28', label:'게시 후 28일', pub:true, f:pub => [pub, minISO(addDays(pub, 27), todayISO())]},
+];
+const minISO = (a, b) => a < b ? a : b;
+function setPeriod(from, to){
+  state.cur = {...readForm(), periodFrom:from, periodTo:to}; state.isExample = false;
+  render();
+}
+function renderPeriod(){
+  const v = state.cur, pi = periodInfo(v);
+  $('#periodText').textContent = v.periodTo ? (v.periodFrom ? `${v.periodFrom} ~ ${v.periodTo}` : `전체 기간 ~ ${v.periodTo}`) : '기간 선택';
+  $('#periodInfo').textContent = v.periodTo ? pi.label : '';
+  const open = state.rp.open;
+  $('#rangePicker').hidden = !open;
+  $('#periodBtn').setAttribute('aria-expanded', open);
+  if (!open) return;
+  const pub = toISODate($('#f-published').value), today = todayISO();
+  $('#rpPresets').innerHTML = PRESETS.map(p => `<button type="button" data-preset="${p.id}"${p.pub && !pub ? ' disabled title="게시일 먼저 입력"' : ''}>${p.label}</button>`).join('');
+  const [y, m] = state.rp.month.split('-').map(Number);
+  $('#rpMonth').textContent = `${y}년 ${m}월`;
+  const startDow = new Date(y, m - 1, 1).getDay(), days = new Date(y, m, 0).getDate();
+  const a = state.rp.pick ? state.rp.pick : (v.periodFrom || (v.periodTo && pub) || '');
+  const b = state.rp.pick ? '' : (v.periodTo || '');
+  let html = ['일','월','화','수','목','금','토'].map(d => `<span class="dw">${d}</span>`).join('');
+  for (let i = 0; i < startDow; i++) html += '<span></span>';
+  for (let i = 1; i <= days; i++){
+    const dt = `${state.rp.month}-${String(i).padStart(2,'0')}`;
+    const cls = [dt === a ? 'st' : '', dt === b || (state.rp.pick && dt === a) ? 'en' : '', a && b && dt > a && dt < b ? 'in' : '', dt === pub ? 'pub' : '', dt === today ? 'td' : ''].filter(Boolean).join(' ');
+    html += `<button type="button" data-day="${dt}" class="${cls}"${dt > today ? ' disabled' : ''}>${i}</button>`;
+  }
+  $('#rpGrid').innerHTML = html;
+}
+$('#periodBtn').addEventListener('click', () => {
+  state.rp.open = !state.rp.open; state.rp.pick = null;
+  if (state.rp.open) state.rp.month = (state.cur.periodTo || state.cur.periodFrom || todayISO()).slice(0, 7);
+  renderPeriod();
+});
+$('#rangePicker').addEventListener('click', e => {
+  const nav = e.target.closest('[data-rnav]');
+  if (nav){ const [y, m] = state.rp.month.split('-').map(Number); state.rp.month = localISO(new Date(y, m - 1 + (+nav.dataset.rnav), 1)).slice(0, 7); renderPeriod(); return; }
+  const pr = e.target.closest('[data-preset]');
+  if (pr){ const p = PRESETS.find(x => x.id === pr.dataset.preset); const [f, t] = p.f(toISODate($('#f-published').value)); state.rp.pick = null; state.rp.month = t.slice(0, 7); setPeriod(f, t); return; }
+  const day = e.target.closest('[data-day]');
+  if (day){
+    const dt = day.dataset.day;
+    if (!state.rp.pick){ state.rp.pick = dt; renderPeriod(); return; }
+    const [f, t] = dt < state.rp.pick ? [dt, state.rp.pick] : [state.rp.pick, dt];
+    state.rp.pick = null; setPeriod(f, t); return;
+  }
+  if (e.target.closest('#rpClear')){ state.rp.pick = null; setPeriod('', ''); return; }
+  if (e.target.closest('#rpDone')){ state.rp.open = false; state.rp.pick = null; renderPeriod(); }
+});
+
+function renderTimeline(){
+  const h = state.editingId && state.history.find(x => x.id === state.editingId);
+  const panel = $('#tlPanel');
+  if (!h){ panel.hidden = true; return; }
+  const ss = snapsOf(h), multi = !!(h.snaps && Object.keys(h.snaps).length > 1);
+  panel.hidden = false;
+  const curKey = snapKey(state.cur);
+  $('#tlTbl').innerHTML = `<thead><tr><th>조회 기간</th><th>기준</th><th>조회수</th><th>클릭률</th><th>초반 유지</th><th>조회율</th><th>반응률</th><th>구독/1천</th><th>병목</th><th></th></tr></thead><tbody>` +
+    ss.map(sn => {
+      const d = derive(sn), pi = periodInfo(sn), k = snapKey(sn);
+      const r = diagnose(d, channelAvg(sn.channel, sn.format, h.id, null, pi.key));
+      const nm = d.views == null && d.impressions == null;
+      return `<tr class="clickable${k === curKey ? ' cur' : ''}" data-snap="${esc(k)}"><td class="txt">${esc(fmtPeriod(sn) || '미지정')}</td><td class="txt">${esc(pi.label)}</td><td>${f0(d.views)}</td><td>${pct1(d.ctr)}</td><td>${pct0(d.ret30)}</td><td>${pct1(d.avp)}</td><td>${pct1(d.engRate)}</td><td>${f1(d.subsPer1k)}</td>
+        <td class="txt">${nm ? '<span class="chip s-none">지표 부족</span>' : r.neck ? `<span class="chip s-bad">${esc(r.neck.name)}</span>` : '<span class="chip s-good">없음</span>'}</td>
+        <td>${multi && state.canWrite ? `<button class="btn mini" data-snapdel="${esc(k)}" type="button">${state.snapArm === k ? '삭제 확인' : '삭제'}</button>` : ''}</td></tr>`;
+    }).join('') + '</tbody>';
+}
+$('#tlTbl').addEventListener('click', async e => {
+  const h = state.history.find(x => x.id === state.editingId); if (!h) return;
+  const del = e.target.closest('[data-snapdel]');
+  if (del){
+    const k = del.dataset.snapdel;
+    if (state.snapArm !== k){ state.snapArm = k; renderTimeline(); return; }
+    state.snapArm = null;
+    const snaps = {...h.snaps}; delete snaps[k];
+    try {
+      await state.db.collection('videos').doc(h.id).set(buildDoc(h, snaps));
+      if (snapKey(state.cur) === k){ const nh = state.history.find(x => x.id === h.id); if (nh){ state.cur = {...snapsOf(nh).pop()}; delete state.cur.snaps; fillForm(state.cur); } }
+      render();
+    } catch (err){ showMsg('#saveMsg', '삭제 실패: ' + (err.message || err.code), true); }
+    return;
+  }
+  const tr = e.target.closest('[data-snap]');
+  if (tr){ const sn = snapsOf(h).find(x => snapKey(x) === tr.dataset.snap); if (sn){ state.cur = {...sn}; delete state.cur.snaps; state.snapArm = null; fillForm(state.cur); render(); } }
 });
 
 /* ---------- 가져오기 ---------- */
@@ -1018,7 +1213,7 @@ function pick(i){
   const v = state.parsed[i]; if (!v) return;
   state.pickIdx = i;
   [...$('#pickList').children].forEach((b, j) => b.setAttribute('aria-pressed', j === i));
-  const base = {channel:$('#f-channel').value, series:$('#f-series').value, format: v.durationSec != null ? (v.durationSec <= 60 ? 'shorts' : 'long') : (state.cur.format || 'long')};
+  const base = {channel:$('#f-channel').value, series:$('#f-series').value, periodFrom:state.cur.periodFrom || '', periodTo:state.cur.periodTo || '', format: v.durationSec != null ? (v.durationSec <= 60 ? 'shorts' : 'long') : (state.cur.format || 'long')};
   const merged = {...base, ...v};
   if (v.videoId && !v.url) merged.url = 'https://youtu.be/' + v.videoId;
   if (!v.title && !v.videoId){ merged.title = $('#f-title').value.trim(); merged.url = $('#f-url').value.trim(); }
@@ -1032,7 +1227,12 @@ function readCsv(f){
   if (!f) return;
   if (!/\.(csv|tsv|txt)$/i.test(f.name)){ showMsg('#importMsg', 'CSV 파일만 가능. 스튜디오에서 받은 압축 파일은 풀어서 "표 데이터.csv"를 넣기', true); return; }
   const rd = new FileReader();
-  rd.onload = () => applyImported(importText(String(rd.result)));
+  const m = f.name.match(/(\d{4}-\d{2}-\d{2})\s*[_~]\s*(\d{4}-\d{2}-\d{2})/);
+  if (m){ state.cur.periodFrom = m[1]; state.cur.periodTo = m[2]; }
+  rd.onload = () => {
+    applyImported(importText(String(rd.result)));
+    if (state.parsed.length) showMsg('#importMsg', $('#importMsg').textContent + (m ? `. 파일 이름에서 조회 기간 ${fmtMD(m[1])}~${fmtMD(m[2])} 인식` : `. 조회 기간 ${state.cur.periodTo ? fmtPeriod(state.cur) : '미지정'} — 스튜디오에서 고른 기간과 다르면 아래 '조회 기간'에서 수정`));
+  };
   rd.onerror = () => showMsg('#importMsg', '파일을 읽지 못함', true);
   rd.readAsText(f, 'utf-8');
 }
@@ -1049,7 +1249,7 @@ $('#saveAllBtn').addEventListener('click', async () => {
   try {
     for (const v of state.parsed){
       const fmt = v.durationSec != null && v.durationSec <= 60 ? 'shorts' : 'long';
-      const full = {...v, channel:ch, series:se, format:fmt, url: v.url || (v.videoId ? 'https://youtu.be/' + v.videoId : '')};
+      const full = {...v, channel:ch, series:se, periodFrom:state.cur.periodFrom || '', periodTo:state.cur.periodTo || '', format:fmt, url: v.url || (v.videoId ? 'https://youtu.be/' + v.videoId : '')};
       const existing = matchSaved(full)?.id || full.videoId || null;
       await saveOne(full, existing); ok++;
     }
