@@ -6,9 +6,7 @@
 <title>영상 지표 진단실</title>
 <meta name="description" content="YouTube 스튜디오 표를 붙여넣으면 노출부터 구독까지 6단계로 병목과 잘된 점을 계산하는 무료 진단 도구">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230E6B73'/%3E%3Crect x='7' y='17' width='4' height='8' rx='1' fill='white'/%3E%3Crect x='14' y='11' width='4' height='14' rx='1' fill='white'/%3E%3Crect x='21' y='6' width='4' height='19' rx='1' fill='white'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
 <style>
 /* Layout: 왼쪽 입력 패널(가져오기 → 지표 수정), 오른쪽 진단(병목 요약 → 깔때기 6단계 → 잘된 점/문제점 → 계산 지표), 하단 채널·시리즈 관리 + 저장 기록 */
 :root{
@@ -16,9 +14,10 @@
   --accent:#0E6B73; --accent-ink:#FFFFFF; --accent-soft:#DCEFF0;
   --good:#23824A; --good-soft:#E1F3E8; --ok:#6E7888; --ok-soft:#ECEFF3; --warn:#B85F00; --warn-soft:#FBEBD6;
   --up:#D7263D; --down:#2563EB;
-  --f-display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
-  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
-  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  /* 서체는 Pretendard 한 종류로 통일, 숫자는 tabular-nums로 자릿수 정렬 */
+  --f-display:"Pretendard","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-body:var(--f-display);
+  --f-mono:var(--f-display);
   --r:10px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
@@ -38,10 +37,10 @@
 [hidden]{display:none!important}
 img{max-width:100%}
 .foot{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55}
+body{margin:0;font-variant-numeric:tabular-nums;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55}
 .wrap{max-width:1200px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:24px}
 header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
-h1{font-family:var(--f-display);font-weight:400;font-size:34px;line-height:1.1;margin:0;letter-spacing:-.01em}
+h1{font-family:var(--f-display);font-weight:700;font-size:30px;line-height:1.2;margin:0;letter-spacing:-.02em}
 .sub{color:var(--muted);margin:6px 0 0;max-width:62ch}
 .status-line{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
@@ -80,7 +79,7 @@ input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-vis
 .result{display:flex;flex-direction:column;gap:18px;min-width:0}
 .verdict{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:8px}
 .verdict .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
-.verdict .vt{font-family:var(--f-display);font-size:28px;line-height:1.2;margin:0;text-wrap:balance}
+.verdict .vt{font-family:var(--f-display);font-weight:700;font-size:24px;line-height:1.3;margin:0;letter-spacing:-.01em;text-wrap:balance}
 .verdict .vt em{font-style:normal;color:var(--warn)}
 .verdict .vt em.g{color:var(--good)}
 .verdict p{margin:0;max-width:70ch}
@@ -251,7 +250,7 @@ tr.cur td{background:var(--accent-soft)}
 
   <footer class="foot">
     <span>입력한 지표와 기록은 서버로 보내지 않고 이 브라우저에만 저장. 기기를 옮길 때는 "기록 내보내기 → 불러오기" 사용</span>
-    <span>v1.0</span>
+    <span>v1.1</span>
   </footer>
 </div>
 
