@@ -172,22 +172,19 @@ tr.cur td{background:var(--accent-soft)}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line);border-left:1px solid var(--line);border-radius:8px;overflow:hidden}
 .cal .dow{font-size:11px;font-weight:600;color:var(--muted);text-align:center;padding:6px 0;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--sunk)}
 .cal .day{min-height:96px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px;display:flex;flex-direction:column;gap:3px;min-width:0;background:var(--surface)}
-.cal .day.add{cursor:pointer}
-.cal .day.add:hover{background:var(--sunk)}
 .cal .day.out{background:var(--sunk)}
 .cal .day.out .dn{opacity:.5}
 .cal .dn{font-size:11px;color:var(--muted);align-self:flex-start;padding:0 5px;border-radius:99px;line-height:1.7}
 .cal .day.today .dn{background:var(--accent);color:var(--accent-ink);font-weight:700}
 .ev{display:block;width:100%;text-align:left;font:inherit;font-size:11px;line-height:1.4;padding:2px 5px;border-radius:4px;border:0;border-left:3px solid var(--good);background:var(--good-soft);color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
 .ev.bad{border-left-color:var(--warn);background:var(--warn-soft)}
-.ev.plan{background:var(--surface);border:1px dashed var(--accent);border-left:3px solid var(--accent)}
+.ev.empty{border-left-color:var(--ok);background:var(--ok-soft);color:var(--muted)}
 .ev.cur{outline:2px solid var(--accent);outline-offset:-1px}
 @media (max-width:600px){.cal .day{min-height:58px;padding:3px}.ev{font-size:0;height:7px;padding:0}}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px;background:var(--good-soft);border-left:3px solid var(--good)}
 .legend i.bad{background:var(--warn-soft);border-left-color:var(--warn)}
-.legend i.plan{background:var(--surface);border:1px dashed var(--accent);border-left:3px solid var(--accent)}
-.chip.s-plan{background:var(--accent-soft);color:var(--accent)}
+.legend i.empty{background:var(--ok-soft);border-left-color:var(--ok)}
 .backup{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
 @media (prefers-reduced-motion:no-preference){.stage,.verdict{transition:border-color .2s}}
 </style>
@@ -238,7 +235,7 @@ tr.cur td{background:var(--accent-soft)}
         <div class="full addrow" id="seAddRow" hidden><input type="text" id="seNew" placeholder="새 시리즈 이름" autocomplete="off"><button class="btn mini primary" id="seAddBtn" type="button">추가</button><button class="btn mini" id="seAddCancel" type="button">취소</button></div>
         <div class="full" id="catMsg" hidden></div>
         <div class="full"><label for="f-title">영상 제목</label><input type="text" id="f-title"></div>
-        <div class="full"><label for="f-published">게시일 (업로드 예정일도 가능)</label><input type="date" id="f-published"></div>
+        <div class="full"><label for="f-published">게시일</label><input type="date" id="f-published"></div>
         <div class="full"><label for="f-url">영상 링크</label><input type="url" id="f-url" placeholder="https://youtu.be/..."></div>
         <div class="full">
           <label>형식</label>
@@ -295,7 +292,7 @@ tr.cur td{background:var(--accent-soft)}
 
   <footer class="foot">
     <span>입력한 지표와 기록은 서버로 보내지 않고 이 브라우저에만 저장. 기기를 옮길 때는 "기록 내보내기 → 불러오기" 사용</span>
-    <span>v1.3</span>
+    <span>v1.4</span>
   </footer>
 </div>
 
@@ -727,6 +724,7 @@ function fillForm(v){
   renderCatSelects();
   $('#f-title').value = v.title || '';
   $('#f-published').value = toISODate(v.published) || '';
+  $('#f-published').max = todayISO();
   $('#f-url').value = v.url || '';
   FORM.forEach(f => { const x = v[f.k]; $('#f-'+f.k).value = x == null ? '' : (f.time ? fmtTime(x) : String(Math.round(x*100)/100)); });
   setFormat(v.format || 'long', false);
@@ -878,7 +876,7 @@ function renderHistory(){
         <td class="txt" title="${esc(h.title)}">${esc(h.title || '제목 없음')}${h.format === 'shorts' ? ' <span class="tag">쇼츠</span>' : ''}</td>
         <td class="txt">${esc(h.channel || '–')}${h.series ? ' › ' + esc(h.series) : ''}</td><td class="txt">${esc(toISODate(h.published) || h.published || '–')}</td>
         <td>${f0(d.impressions)}</td><td>${pct1(d.ctr)}</td><td>${pct0(d.ret30)}</td><td>${pct1(d.avp)}</td><td>${pct1(d.engRate)}</td><td>${f1(d.subsPer1k)}</td>
-        <td class="txt">${isPlanned(h) ? '<span class="chip s-plan">예정</span>' : r.neck ? `<span class="chip s-bad">${esc(r.neck.name)}</span>` : '<span class="chip s-good">없음</span>'}</td>
+        <td class="txt">${noMetrics(h) ? '<span class="chip s-none">지표 부족</span>' : r.neck ? `<span class="chip s-bad">${esc(r.neck.name)}</span>` : '<span class="chip s-good">없음</span>'}</td>
         <td>${state.canWrite ? `<button class="btn mini" data-del="${esc(h.id)}" type="button">${state.delArm === h.id ? '삭제 확인' : '삭제'}</button>` : ''}</td></tr>`;
     }).join('') + '</tbody>';
 }
@@ -906,9 +904,9 @@ function loadVideo(id){
 
 /* ---------- 캘린더 ---------- */
 const todayISO = () => localISO(new Date());
-const isPlanned = h => { const dt = toISODate(h.published); return (dt && dt > todayISO()) || (h.views == null && h.impressions == null); };
+const noMetrics = h => h.views == null && h.impressions == null;
 function evStatus(h){
-  if (isPlanned(h)) return 'plan';
+  if (noMetrics(h)) return 'empty';
   return diagnose(derive(h), channelAvg(h.channel, h.format, h.id)).neck ? 'bad' : 'good';
 }
 function renderCalendar(list){
@@ -922,30 +920,28 @@ function renderCalendar(list){
     const dt = toISODate(h.published);
     if (!dt){ undated++; continue; }
     (byDate[dt] ||= []).push({h, st: evStatus(h)});
-    if (!isPlanned(h)) pubDates.push(dt);
+    pubDates.push(dt);
   }
   const monthEvs = Object.entries(byDate).filter(([dt]) => dt.startsWith(ym)).sort((a, b) => a[0] < b[0] ? -1 : 1);
-  const nDone = monthEvs.reduce((n, [, evs]) => n + evs.filter(e => e.st !== 'plan').length, 0);
-  const nPlan = monthEvs.reduce((n, [, evs]) => n + evs.filter(e => e.st === 'plan').length, 0);
+  const nDone = monthEvs.reduce((n, [, evs]) => n + evs.length, 0);
+  const nBad = monthEvs.reduce((n, [, evs]) => n + evs.filter(e => e.st === 'bad').length, 0);
   pubDates.sort();
   const DAY = 86400000;
   const gap = pubDates.length >= 2 ? (Date.parse(pubDates[pubDates.length-1]) - Date.parse(pubDates[0])) / DAY / (pubDates.length - 1) : null;
   const since = pubDates.length ? Math.round((Date.parse(today) - Date.parse(pubDates[pubDates.length-1])) / DAY) : null;
-  const nextPlan = Object.keys(byDate).filter(dt => dt >= today && byDate[dt].some(e => e.st === 'plan')).sort()[0];
 
   const first = new Date(y, m - 1, 1), startDow = first.getDay(), days = new Date(y, m, 0).getDate();
   const cells = [];
   for (let i = 0; i < startDow; i++){ const d = new Date(y, m - 1, i - startDow + 1); cells.push({dt: localISO(d), n: d.getDate(), out: true}); }
   for (let i = 1; i <= days; i++) cells.push({dt: `${ym}-${String(i).padStart(2,'0')}`, n: i});
   while (cells.length % 7){ const d = new Date(y, m, cells.length - startDow - days + 1); cells.push({dt: localISO(d), n: d.getDate(), out: true}); }
-  const ed = canEditCats();
   const evHtml = ({h, st}) => `<button type="button" class="ev ${st}${h.id === state.editingId ? ' cur' : ''}" data-ev="${esc(h.id)}" title="${esc((h.title || '제목 없음') + (h.channel ? ' · ' + h.channel : '') + (h.series ? ' › ' + h.series : ''))}">${esc(h.title || '제목 없음')}</button>`;
   const grid = ['일','월','화','수','목','금','토'].map(d => `<div class="dow">${d}</div>`).join('') + cells.map(c => {
     const evs = c.out ? [] : (byDate[c.dt] || []);
-    return `<div class="day${c.out ? ' out' : ''}${c.dt === today ? ' today' : ''}${!c.out && ed ? ' add' : ''}"${!c.out && ed ? ` data-date="${c.dt}" title="${c.dt} 업로드 예정 영상 추가"` : ''}><span class="dn">${c.n}</span>${evs.map(evHtml).join('')}</div>`;
+    return `<div class="day${c.out ? ' out' : ''}${c.dt === today ? ' today' : ''}"><span class="dn">${c.n}</span>${evs.map(evHtml).join('')}</div>`;
   }).join('');
 
-  const stLabel = {good:'<span class="chip s-good">병목 없음</span>', bad:'', plan:'<span class="chip s-plan">예정</span>'};
+  const stLabel = {good:'<span class="chip s-good">병목 없음</span>', bad:'', empty:'<span class="chip s-none">지표 부족</span>'};
   const rows = monthEvs.flatMap(([dt, evs]) => evs.map(e => {
     const r = e.st === 'bad' ? diagnose(derive(e.h), channelAvg(e.h.channel, e.h.format, e.h.id)) : null;
     return `<tr class="clickable${e.h.id === state.editingId ? ' cur' : ''}" data-id="${esc(e.h.id)}"><td class="txt">${dt.slice(5).replace('-', '.')} (${'일월화수목금토'[new Date(dt + 'T00:00').getDay()]})</td><td class="txt" title="${esc(e.h.title)}">${esc(e.h.title || '제목 없음')}</td><td class="txt">${esc(e.h.channel || '–')}${e.h.series ? ' › ' + esc(e.h.series) : ''}</td><td class="txt">${e.st === 'bad' ? `<span class="chip s-bad">${esc(r.neck.name)}</span>` : stLabel[e.st]}</td></tr>`;
@@ -954,11 +950,11 @@ function renderCalendar(list){
   el.innerHTML = `
     <div class="cal-head">
       <div class="row"><button class="btn mini" data-nav="-1" type="button" aria-label="이전 달">‹</button><span class="mo">${y}년 ${m}월</span><button class="btn mini" data-nav="1" type="button" aria-label="다음 달">›</button><button class="btn mini" data-nav="0" type="button">오늘</button></div>
-      <div class="legend"><span><i></i>병목 없음</span><span><i class="bad"></i>병목 있음</span><span><i class="plan"></i>업로드 예정</span></div>
+      <div class="legend"><span><i></i>병목 없음</span><span><i class="bad"></i>병목 있음</span><span><i class="empty"></i>지표 부족</span></div>
     </div>
-    <div class="sum"><span>이번 달 업로드 <b>${nDone}</b>편</span><span>예정 <b>${nPlan}</b>편</span><span>평균 업로드 간격 <b>${gap != null ? f1(gap) + '일' : '–'}</b></span><span>마지막 업로드 후 <b>${since != null ? since + '일' : '–'}</b></span><span>다음 예정 <b>${nextPlan ? nextPlan.slice(5).replace('-', '.') : '없음'}</b></span>${undated ? `<span>게시일 없는 영상 <b>${undated}</b>편</span>` : ''}</div>
+    <div class="sum"><span>이번 달 업로드 <b>${nDone}</b>편</span><span>병목 있음 <b>${nBad}</b>편</span><span>평균 업로드 간격 <b>${gap != null ? f1(gap) + '일' : '–'}</b></span><span>마지막 업로드 후 <b>${since != null ? since + '일' : '–'}</b></span>${undated ? `<span>게시일 없는 영상 <b>${undated}</b>편</span>` : ''}</div>
     <div class="cal-wrap"><div class="cal">${grid}</div></div>
-    <p class="hint">${ed ? '빈 날짜를 누르면 그날 올릴 예정 영상 입력 시작. ' : ''}영상을 누르면 해당 영상 진단. 지표가 없거나 오늘 이후 날짜인 영상은 "예정"으로 표시</p>
+    <p class="hint">영상을 누르면 해당 영상 진단. 게시일이 있는 영상만 달력에 표시</p>
     ${rows ? `<div class="tbl-wrap"><table><thead><tr><th>날짜</th><th>제목</th><th>채널 › 시리즈</th><th>상태</th></tr></thead><tbody>${rows}</tbody></table></div>` : '<p class="empty" style="margin:0">이번 달 영상 없음</p>'}`;
 }
 $('#calView').addEventListener('click', e => {
@@ -973,16 +969,6 @@ $('#calView').addEventListener('click', e => {
   if (ev){ loadVideo(ev.dataset.ev); return; }
   const tr = e.target.closest('tr[data-id]');
   if (tr){ loadVideo(tr.dataset.id); return; }
-  const day = e.target.closest('[data-date]');
-  if (day){
-    const keepCh = state.filterCh || $('#f-channel').value;
-    const keepSe = state.filterCh ? (state.filterSe && state.filterSe !== '__none' ? state.filterSe : '') : $('#f-series').value;
-    state.cur = {channel:keepCh, series:keepSe, format:state.cur.format || 'long', published:day.dataset.date};
-    state.editingId = null; state.isExample = false;
-    fillForm(state.cur); render(); toTop();
-    showMsg('#saveMsg', `${day.dataset.date} 업로드 예정 영상 입력 중. 제목을 넣고 "기록 저장". 업로드 후 지표를 채우면 진단 시작`);
-    setTimeout(() => $('#f-title').focus({preventScroll:true}), 0);
-  }
 });
 $('#viewList').addEventListener('click', () => { state.view = 'list'; renderHistory(); });
 $('#viewCal').addEventListener('click', () => { state.view = 'cal'; renderHistory(); });
@@ -1026,8 +1012,8 @@ function applyImported(vids){
   pl.innerHTML = vids.map((v, i) => `<button type="button" data-i="${i}" aria-pressed="${i===0}"><span class="t">${esc(v.title || v.videoId || ('영상 ' + (i+1)))}</span><span class="n">${f0(v.views)}회</span></button>`).join('');
   pick(0);
 }
-// CSV 영상을 저장된 기록과 연결: 영상 ID가 같거나, 같은 제목의 예정 영상
-const matchSaved = v => (v.videoId && state.history.find(h => h.id === v.videoId || h.videoId === v.videoId)) || (v.title && state.history.find(h => isPlanned(h) && h.title === v.title)) || null;
+// CSV 영상을 저장된 기록과 연결: 영상 ID 기준
+const matchSaved = v => (v.videoId && state.history.find(h => h.id === v.videoId || h.videoId === v.videoId)) || null;
 function pick(i){
   const v = state.parsed[i]; if (!v) return;
   state.pickIdx = i;
