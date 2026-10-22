@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>영상 지표 진단실</title>
+<meta name="description" content="YouTube 스튜디오 표를 붙여넣으면 노출부터 구독까지 6단계로 병목과 잘된 점을 계산하는 무료 진단 도구">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230E6B73'/%3E%3Crect x='7' y='17' width='4' height='8' rx='1' fill='white'/%3E%3Crect x='14' y='11' width='4' height='14' rx='1' fill='white'/%3E%3Crect x='21' y='6' width='4' height='19' rx='1' fill='white'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 왼쪽 입력 패널(가져오기 → 지표 수정), 오른쪽 진단(병목 요약 → 깔때기 6단계 → 잘된 점/문제점 → 계산 지표), 하단 채널·시리즈 관리 + 저장 기록 */
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --sunk:#F5F7F9; --ink:#15202B; --muted:#5C6877; --line:#D8DEE6;
+  --accent:#0E6B73; --accent-ink:#FFFFFF; --accent-soft:#DCEFF0;
+  --good:#23824A; --good-soft:#E1F3E8; --ok:#6E7888; --ok-soft:#ECEFF3; --warn:#B85F00; --warn-soft:#FBEBD6;
+  --up:#D7263D; --down:#2563EB;
+  --f-display:"Do Hyeon","IBM Plex Sans KR",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1318; --surface:#161D24; --sunk:#11171D; --ink:#E5EAF0; --muted:#94A0AE; --line:#29333E;
+  --accent:#3DB3BB; --accent-ink:#06191B; --accent-soft:#143236;
+  --good:#4CC27A; --good-soft:#15301F; --ok:#8C97A6; --ok-soft:#1E262F; --warn:#F2A33A; --warn-soft:#3A2810;
+  --up:#FF5C6C; --down:#5B8DFF; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0E1318; --surface:#161D24; --sunk:#11171D; --ink:#E5EAF0; --muted:#94A0AE; --line:#29333E;
+  --accent:#3DB3BB; --accent-ink:#06191B; --accent-soft:#143236;
+  --good:#4CC27A; --good-soft:#15301F; --ok:#8C97A6; --ok-soft:#1E262F; --warn:#F2A33A; --warn-soft:#3A2810;
+  --up:#FF5C6C; --down:#5B8DFF; color-scheme:dark;
+}
+*{box-sizing:border-box}
+:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+[hidden]{display:none!important}
+img{max-width:100%}
+.foot{font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 16px;justify-content:space-between;border-top:1px solid var(--line);padding-top:14px}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.55}
+.wrap{max-width:1200px;margin:0 auto;padding-block:28px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:24px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px}
+h1{font-family:var(--f-display);font-weight:400;font-size:34px;line-height:1.1;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:6px 0 0;max-width:62ch}
+.status-line{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.dot.on{background:var(--good)}
+.grid{display:grid;grid-template-columns:minmax(0,380px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.panel h2{font-size:15px;margin:0;font-weight:700}
+.panel h3{font-size:13px;margin:0;font-weight:600;color:var(--muted);letter-spacing:.04em}
+label{font-size:12px;color:var(--muted);font-weight:500;display:block;margin-bottom:4px}
+input[type=text],input[type=url],textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:7px;padding:8px 10px}
+textarea{min-height:110px;resize:vertical;font-family:var(--f-mono);font-size:12px}
+input:focus-visible,textarea:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.fields .full{grid-column:1/-1}
+.fields input{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--sunk);color:var(--muted);padding:7px 14px;font:inherit;font-size:13px;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn{font:inherit;font-size:13px;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.file-btn{position:relative;overflow:hidden}
+.file-btn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.divider{border:0;border-top:1px solid var(--line);margin:2px 0}
+.msg{font-size:12px;padding:8px 10px;border-radius:7px;background:var(--accent-soft);color:var(--ink)}
+.msg.err{background:var(--warn-soft)}
+.picklist{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto}
+.picklist button{text-align:left;font:inherit;font-size:13px;background:var(--sunk);border:1px solid var(--line);border-radius:7px;padding:7px 10px;color:var(--ink);cursor:pointer;display:flex;justify-content:space-between;gap:8px}
+.picklist button[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
+.picklist .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.picklist .n{font-family:var(--f-mono);font-size:12px;color:var(--muted);flex:none}
+
+.result{display:flex;flex-direction:column;gap:18px;min-width:0}
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:8px}
+.verdict .meta{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--muted)}
+.verdict .vt{font-family:var(--f-display);font-size:28px;line-height:1.2;margin:0;text-wrap:balance}
+.verdict .vt em{font-style:normal;color:var(--warn)}
+.verdict .vt em.g{color:var(--good)}
+.verdict p{margin:0;max-width:70ch}
+.tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;background:var(--ok-soft);color:var(--muted);letter-spacing:.02em}
+.tag.ex{background:var(--warn-soft);color:var(--warn)}
+.tag a{color:inherit}
+
+.funnel{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.funnel.n5{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media (max-width:1100px){.funnel,.funnel.n5{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:520px){.funnel,.funnel.n5{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stage{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:6px;position:relative;min-width:0}
+.stage.neck{border:2px solid var(--warn);padding:11px}
+.stage .step{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.stage .nm{font-weight:700;font-size:14px}
+.stage .val{font-family:var(--f-mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;overflow-wrap:anywhere}
+.stage .ds{font-size:11px;color:var(--muted);line-height:1.4}
+.stage .delta{font-family:var(--f-mono);font-size:11px;font-variant-numeric:tabular-nums}
+.up{color:var(--up)} .down{color:var(--down)}
+.neck-label{position:absolute;top:-9px;right:10px;background:var(--warn);color:var(--surface);font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px}
+.chip{align-self:flex-start;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px}
+.s-good{background:var(--good-soft);color:var(--good)}
+.s-ok{background:var(--ok-soft);color:var(--ok)}
+.s-bad{background:var(--warn-soft);color:var(--warn)}
+.s-na,.s-none{background:var(--ok-soft);color:var(--muted)}
+.meter{position:relative;height:6px;border-radius:3px;background:var(--ok-soft);overflow:visible;margin-top:2px}
+.meter .fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px}
+.meter .tick{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--muted);opacity:.6}
+.fill.s-good{background:var(--good)} .fill.s-ok{background:var(--ok)} .fill.s-bad{background:var(--warn)}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:700px){.two{grid-template-columns:1fr}}
+.list{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.list li{display:grid;grid-template-columns:4px 1fr;gap:10px}
+.list li::before{content:"";border-radius:2px;background:var(--good)}
+.list.issues li::before{background:var(--warn)}
+.list.notes li::before{background:var(--accent)}
+.list b{display:block;font-size:14px}
+.list span{color:var(--muted);font-size:13px}
+.list .rel{font-family:var(--f-mono);font-size:11px;margin-left:4px}
+.empty{color:var(--muted);font-size:13px}
+
+.tbl-wrap{overflow-x:auto;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.03em;background:var(--sunk)}
+th:first-child,td:first-child{text-align:left}
+td{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+td.txt{font-family:var(--f-body);max-width:280px;overflow:hidden;text-overflow:ellipsis}
+tr.clickable{cursor:pointer}
+tr.clickable:hover td{background:var(--sunk)}
+tr.cur td{background:var(--accent-soft)}
+.mini{font-size:11px;padding:3px 8px}
+.bottom{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:24px;align-items:start}
+@media (max-width:960px){.bottom{grid-template-columns:minmax(0,1fr)}}
+.cat{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;background:var(--sunk)}
+.cat-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.cat-head b{font-size:14px;overflow-wrap:anywhere;min-width:0}
+.cnt{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.schip{display:inline-flex;align-items:center;gap:4px;font-size:12px;background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:2px 3px 2px 10px}
+.schip button{border:0;background:none;color:var(--muted);cursor:pointer;font:inherit;font-size:12px;padding:0 7px;border-radius:99px;line-height:1.6}
+.schip button.arm{background:var(--warn);color:var(--surface);font-weight:600}
+.addrow{display:flex;gap:6px}
+.addrow input{flex:1;min-width:0}
+.sum{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--muted);padding:10px 12px;background:var(--sunk);border-radius:8px}
+.sum b{font-family:var(--f-mono);color:var(--ink);font-weight:600}
+.seg.sm button{padding:3px 10px;font-size:12px}
+.backup{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-end}
+@media (prefers-reduced-motion:no-preference){.stage,.verdict{transition:border-color .2s}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>영상 지표 진단실</h1>
+      <p class="sub">YouTube 스튜디오 표를 붙여넣거나 숫자를 입력하면 노출부터 구독까지 6단계로 나눠 병목 구간과 잘된 부분을 계산</p>
+    </div>
+    <div class="backup">
+      <div class="status-line"><span class="dot" id="dbDot"></span><span id="dbState">저장소 확인 중</span></div>
+      <button class="btn mini" id="exportBtn" type="button">기록 내보내기</button>
+      <span class="btn mini file-btn">기록 불러오기<input type="file" id="importJson" accept=".json,application/json"></span>
+    </div>
+  </header>
+  <div id="backupMsg" hidden></div>
+
+  <div class="grid">
+    <!-- 입력 -->
+    <aside class="panel" aria-label="지표 입력">
+      <h2>1. 지표 가져오기</h2>
+      <div>
+        <label for="pasteBox">스튜디오 표 붙여넣기 (CSV·복사한 표·"항목 값" 줄 모두 가능)</label>
+        <textarea id="pasteBox" placeholder="동영상 제목	노출수	노출 클릭률 (%)	조회수	평균 시청 지속 시간 ...&#10;금리 뉴스 읽는 법	18400	6.8	1520	0:03:48 ..."></textarea>
+      </div>
+      <div class="row">
+        <button class="btn primary" id="importBtn" type="button">표 읽기</button>
+        <span class="btn file-btn">CSV 파일 열기<input type="file" id="fileIn" accept=".csv,.tsv,.txt,text/csv"></span>
+      </div>
+      <p class="hint">스튜디오 → 분석 → 고급 모드 → 내보내기(CSV), 또는 표를 드래그해 복사. 여러 영상이 담긴 표는 한 번에 인식</p>
+      <div id="importMsg" hidden></div>
+      <div class="picklist" id="pickList" hidden></div>
+      <div class="row" id="pickActions" hidden><button class="btn" id="saveAllBtn" type="button">인식된 영상 모두 저장</button></div>
+
+      <hr class="divider">
+      <h2>2. 영상 정보·지표 확인</h2>
+      <div class="fields">
+        <div><label for="f-channel">채널</label><select id="f-channel"></select></div>
+        <div><label for="f-series">시리즈</label><select id="f-series"></select></div>
+        <p class="hint full" style="margin-top:-4px">목록에 없는 채널·시리즈는 아래 '채널·시리즈 관리'에서 추가</p>
+        <div class="full"><label for="f-title">영상 제목</label><input type="text" id="f-title"></div>
+        <div class="full"><label for="f-url">영상 링크</label><input type="url" id="f-url" placeholder="https://youtu.be/..."></div>
+        <div class="full">
+          <label>형식</label>
+          <div class="seg" role="group" aria-label="영상 형식"><button type="button" id="fmtLong" aria-pressed="true">롱폼</button><button type="button" id="fmtShorts" aria-pressed="false">쇼츠</button></div>
+        </div>
+      </div>
+      <p class="hint">링크는 영상 구분·바로가기용. 노출수·클릭률·시청 유지율은 채널 주인만 보는 비공개 지표라 링크만으로는 가져올 수 없음</p>
+      <div class="fields" id="metricFields"></div>
+      <p class="hint" id="ret30Hint">30초 유지율: 영상별 분석 → 참여도 탭 '시청 지속 시간 주요 순간'의 0:30 시점 수치</p>
+      <div class="row">
+        <button class="btn primary" id="saveBtn" type="button">기록 저장</button>
+        <button class="btn" id="newBtn" type="button">새 영상</button>
+      </div>
+      <div id="saveMsg" hidden></div>
+    </aside>
+
+    <!-- 결과 -->
+    <section class="result" aria-label="진단 결과">
+      <div class="verdict" id="verdict"></div>
+      <div class="funnel" id="funnel"></div>
+      <div class="two">
+        <div class="panel"><h2>잘된 점</h2><ul class="list" id="goods"></ul></div>
+        <div class="panel"><h2>문제점·개선 액션</h2><ul class="list issues" id="issues"></ul></div>
+      </div>
+      <div class="panel" id="notesPanel" hidden><h2>유입 경로 참고</h2><ul class="list notes" id="notes"></ul></div>
+      <div class="panel">
+        <h2>계산 지표</h2>
+        <div class="tbl-wrap"><table id="calcTbl"></table></div>
+        <p class="hint" id="benchNote"></p>
+      </div>
+    </section>
+  </div>
+
+  <div class="bottom">
+  <section class="panel" aria-label="채널·시리즈 관리">
+    <h2>채널·시리즈 관리</h2>
+    <p class="hint">여기 등록한 채널·시리즈가 입력 칸과 기록 필터에 표시. 삭제해도 저장된 영상 기록은 그대로 유지</p>
+    <div class="addrow"><input type="text" id="newChannel" placeholder="새 채널 이름" autocomplete="off"><button class="btn" id="addChannelBtn" type="button">채널 추가</button></div>
+    <div id="catList" style="display:flex;flex-direction:column;gap:10px"></div>
+    <div id="catMsg" hidden></div>
+  </section>
+
+  <section class="panel" aria-label="저장 기록">
+    <div class="row" style="justify-content:space-between">
+      <h2>저장한 영상</h2>
+      <div class="row">
+        <label for="histFilter" style="margin:0">채널</label><select id="histFilter" style="width:auto"></select>
+        <label for="histSeries" style="margin:0">시리즈</label><select id="histSeries" style="width:auto"></select>
+      </div>
+    </div>
+    <div class="sum" id="histSum" hidden></div>
+    <p class="hint">같은 채널(또는 시리즈) 영상이 3편 이상 쌓이면 그 평균과 비교해 판정 보정. 행을 누르면 해당 영상 진단</p>
+    <div class="tbl-wrap"><table id="histTbl"></table></div>
+  </section>
+  </div>
+
+  <footer class="foot">
+    <span>입력한 지표와 기록은 서버로 보내지 않고 이 브라우저에만 저장. 기기를 옮길 때는 "기록 내보내기 → 불러오기" 사용</span>
+    <span>v1.0</span>
+  </footer>
+</div>
+
+<script>
+(() => {
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* ---------- 필드 정의 ---------- */
+const FORM = [
+  {k:'impressions', label:'노출수', ph:'18400'},
+  {k:'ctr', label:'노출 클릭률 (%)', ph:'6.8'},
+  {k:'views', label:'조회수', ph:'1520'},
+  {k:'durationSec', label:'영상 길이', ph:'12:22', time:true},
+  {k:'avdSec', label:'평균 시청 지속 시간', ph:'3:48', time:true},
+  {k:'avp', label:'평균 조회율 (%)', ph:'비우면 자동 계산'},
+  {k:'ret30', label:'30초 시청 유지율 (%)', labelShorts:'계속 시청 비율 (%)', ph:'58'},
+  {k:'watchHours', label:'시청 시간 (시간)', ph:'비우면 자동 계산'},
+  {k:'subs', label:'구독자 증감', ph:'9'},
+  {k:'likes', label:'좋아요', ph:'61'},
+  {k:'comments', label:'댓글', ph:'12'},
+  {k:'shares', label:'공유', ph:'7'},
+  {k:'tBrowse', label:'탐색 기능 유입 (%)', ph:'34'},
+  {k:'tSuggested', label:'추천 동영상 유입 (%)', ph:'21'},
+  {k:'tSearch', label:'YouTube 검색 유입 (%)', ph:'18'},
+];
+const NUM_KEYS = FORM.map(f => f.k);
+const TIME_KEYS = ['durationSec','avdSec'];
+
+const ALIASES = {
+  videoId:['콘텐츠','content','동영상','video'],
+  title:['동영상 제목','video title','제목','title'],
+  published:['동영상 게시 시간','video publish time','게시 시간','게시일','publish time'],
+  durationSec:['길이','duration','동영상 길이','영상 길이'],
+  views:['조회수','views'],
+  watchHours:['시청 시간(단위: 시간)','시청 시간','watch time (hours)','watch time'],
+  subs:['구독자','subscribers','구독자 증감','순 구독자'],
+  impressions:['노출수','impressions','노출'],
+  ctr:['노출 클릭률 (%)','노출 클릭률','impressions click-through rate (%)','impressions click-through rate','클릭률','ctr'],
+  avdSec:['평균 시청 지속 시간','average view duration','평균 시청 시간'],
+  avp:['평균 조회율 (%)','평균 조회율','average percentage viewed (%)','average percentage viewed'],
+  likes:['좋아요 수','좋아요','likes'],
+  comments:['추가된 댓글 수','댓글','comments added','comments'],
+  shares:['공유','shares','공유 수'],
+  ret30:['30초 시청 유지율','30초 유지율','처음 30초','계속 시청 비율','계속 시청','stayed to watch'],
+  tBrowse:['탐색 기능','browse features'],
+  tSuggested:['추천 동영상','suggested videos'],
+  tSearch:['youtube 검색','youtube search'],
+};
+const norm = s => String(s||'').toLowerCase().replace(/\s+/g,'');
+
+/* ---------- 파싱 ---------- */
+function parseNum(s){
+  if (s == null) return null;
+  const t = String(s).replace(/[,%\s명회시간]/g,'').replace(/[−–]/g,'-');
+  if (t === '' || t === '-' ) return null;
+  const n = Number(t);
+  return isFinite(n) ? n : null;
+}
+function parseTime(s){
+  if (s == null) return null;
+  const t = String(s).trim();
+  if (!t) return null;
+  if (t.includes(':')){
+    const p = t.split(':').map(Number);
+    if (p.some(x => !isFinite(x))) return null;
+    return p.reduce((a,b) => a*60 + b, 0);
+  }
+  const m = t.match(/(?:(\d+)\s*분)?\s*(?:(\d+)\s*초)?/);
+  if (m && (m[1] || m[2])) return (+m[1]||0)*60 + (+m[2]||0);
+  return parseNum(t);
+}
+function fmtTime(sec){
+  if (sec == null || !isFinite(sec)) return '';
+  sec = Math.round(sec);
+  const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60;
+  return (h ? h+':'+String(m).padStart(2,'0') : m) + ':' + String(s).padStart(2,'0');
+}
+function parseDelimited(text){
+  text = text.replace(/^﻿/,'').replace(/\r\n?/g,'\n');
+  const first = text.split('\n').find(l => l.trim()) || '';
+  const delim = first.includes('\t') ? '\t' : ',';
+  const rows = []; let row = [], cell = '', q = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (q){
+      if (c === '"'){ if (text[i+1] === '"'){ cell += '"'; i++; } else q = false; }
+      else cell += c;
+    } else if (c === '"' && cell === '') q = true;
+    else if (c === delim){ row.push(cell); cell = ''; }
+    else if (c === '\n'){ row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  if (cell !== '' || row.length){ row.push(cell); rows.push(row); }
+  return rows.map(r => r.map(s => s.trim())).filter(r => r.some(x => x));
+}
+function matchField(label, used){
+  const h = norm(label);
+  if (!h || /대비|싫어요|vs|감소|증가율/.test(h)) return null;
+  for (const [k, al] of Object.entries(ALIASES)) if (!used.has(k) && al.some(a => norm(a) === h)) return k;
+  for (const [k, al] of Object.entries(ALIASES)) if (!used.has(k) && al.some(a => norm(a).length > 1 && h.startsWith(norm(a)))) return k;
+  return null;
+}
+function mapHeaders(cells){
+  const used = new Set(), map = {};
+  cells.forEach((c, i) => { const k = matchField(c, used); if (k){ map[k] = i; used.add(k); } });
+  return map;
+}
+function coerce(k, raw){
+  if (['title','videoId','published'].includes(k)) return raw ? String(raw).trim() : null;
+  if (TIME_KEYS.includes(k)) return parseTime(raw);
+  return parseNum(raw);
+}
+function importText(text){
+  const rows = parseDelimited(text);
+  for (let i = 0; i < Math.min(rows.length, 10); i++){
+    const map = mapHeaders(rows[i]);
+    const metricCols = Object.keys(map).filter(k => NUM_KEYS.includes(k));
+    if (metricCols.length >= 2){
+      const vids = [];
+      for (const r of rows.slice(i+1)){
+        const head = norm(r[0]);
+        if (['합계','total','총계'].includes(head)) continue;
+        const v = {};
+        for (const [k, idx] of Object.entries(map)){ const val = coerce(k, r[idx]); if (val != null) v[k] = val; }
+        if (Object.keys(v).filter(k => NUM_KEYS.includes(k)).length >= 2) vids.push(v);
+      }
+      return vids;
+    }
+  }
+  // "항목 값" 형태의 세로 목록
+  const v = {}, used = new Set();
+  for (const line of text.split(/\r?\n/)){
+    let label, val;
+    if (line.includes('\t')){ const p = line.split('\t').map(s => s.trim()).filter(Boolean); label = p[0]; val = p[1]; }
+    else { const m = line.trim().match(/^(.+?)[\s:：]+(-?[\d.,]+(?::\d+)*\s*(?:%|분|초|회|명|시간)?.*)$/); if (m){ label = m[1]; val = m[2]; } }
+    if (!label || val == null) continue;
+    const k = matchField(label, used);
+    if (!k) continue;
+    const c = coerce(k, val);
+    if (c != null){ v[k] = c; used.add(k); }
+  }
+  return Object.keys(v).filter(k => NUM_KEYS.includes(k)).length >= 2 ? [v] : [];
+}
+function videoIdFrom(url){
+  const m = String(url||'').match(/(?:youtu\.be\/|[?&]v=|\/shorts\/|\/live\/|\/embed\/)([\w-]{11})/);
+  return m ? m[1] : (/^[\w-]{11}$/.test(String(url||'').trim()) ? url.trim() : null);
+}
+
+/* ---------- 계산 ---------- */
+function derive(v){
+  const d = {...v};
+  if (d.avp == null && d.avdSec && d.durationSec) d.avp = d.avdSec / d.durationSec * 100;
+  if (d.avdSec == null && d.avp != null && d.durationSec) d.avdSec = d.avp / 100 * d.durationSec;
+  if (d.watchHours == null && d.views && d.avdSec) d.watchHours = d.views * d.avdSec / 3600;
+  const vw = d.views;
+  d.likeRate = vw && d.likes != null ? d.likes / vw * 100 : null;
+  d.commentPer1k = vw && d.comments != null ? d.comments / vw * 1000 : null;
+  d.sharePer1k = vw && d.shares != null ? d.shares / vw * 1000 : null;
+  const parts = [d.likes, d.comments, d.shares].filter(x => x != null);
+  d.engRate = vw && parts.length ? parts.reduce((a,b) => a+b, 0) / vw * 100 : null;
+  d.subsPer1k = vw && d.subs != null ? d.subs / vw * 1000 : null;
+  return d;
+}
+function avpThreshold(d){
+  if (d.format === 'shorts') return [60, 85];
+  const s = d.durationSec || 0;
+  if (s && s <= 300) return [40, 55];
+  if (s && s <= 900) return [30, 45];
+  if (s) return [25, 35];
+  return [30, 45];
+}
+const f1 = x => x == null ? '–' : (Math.round(x*10)/10).toLocaleString('ko-KR');
+const f0 = x => x == null ? '–' : Math.round(x).toLocaleString('ko-KR');
+const pct1 = x => x == null ? '–' : f1(x) + '%';
+const pct0 = x => x == null ? '–' : f0(x) + '%';
+
+function stagesFor(d){
+  const shorts = d.format === 'shorts';
+  if (shorts) return [
+    {k:'views', name:'조회', desc:'쇼츠 피드에서 재생된 횟수', fmt:f0, th:null},
+    {k:'ret30', name:'계속 시청', desc:'넘기지 않고 본 비율', fmt:pct0, th:[60,75]},
+    {k:'avp', name:'시청 유지', desc:'평균 조회율 (반복 재생 시 100% 초과)', fmt:pct1, th:avpThreshold(d)},
+    {k:'engRate', name:'반응', desc:'(좋아요+댓글+공유) ÷ 조회수', fmt:pct1, th:[3,6]},
+    {k:'subsPer1k', name:'구독 전환', desc:'조회 1천 회당 구독 증감', fmt:f1, th:[0.5,2]},
+  ];
+  return [
+    {k:'impressions', name:'노출', desc:'썸네일이 화면에 뜬 횟수', fmt:f0, th:null},
+    {k:'ctr', name:'클릭', desc:'노출 클릭률', fmt:pct1, th:[3,6]},
+    {k:'ret30', name:'초반 유지', desc:'30초 시점 시청 유지율', fmt:pct0, th:[60,70]},
+    {k:'avp', name:'시청 유지', desc:'평균 조회율 (영상 길이별 기준)', fmt:pct1, th:avpThreshold(d)},
+    {k:'engRate', name:'반응', desc:'(좋아요+댓글+공유) ÷ 조회수', fmt:pct1, th:[2.5,5]},
+    {k:'subsPer1k', name:'구독 전환', desc:'조회 1천 회당 구독 증감', fmt:f1, th:[1.5,4]},
+  ];
+}
+function judge(val, th, avg){
+  if (val == null || !isFinite(val)) return {s:'none', rel:null};
+  let s = 'na', rel = null;
+  if (th) s = val < th[0] ? 'bad' : val < th[1] ? 'ok' : 'good';
+  if (avg != null && avg > 0) rel = val / avg - 1;
+  if (rel != null){
+    if (!th) s = rel <= -0.2 ? 'bad' : rel >= 0.2 ? 'good' : 'ok';
+    else if (rel >= 0.15 && s !== 'good') s = s === 'bad' ? 'ok' : 'good';
+    else if (rel <= -0.15 && s !== 'bad') s = s === 'good' ? 'ok' : 'bad';
+  }
+  return {s, rel};
+}
+const S_LABEL = {good:'좋음', ok:'보통', bad:'개선 필요', na:'비교 기준 없음', none:'데이터 없음'};
+const AVG_KEYS = ['impressions','views','ctr','ret30','avp','engRate','subsPer1k','likeRate','commentPer1k','sharePer1k','watchHours'];
+
+function channelAvg(channel, format, excludeId, series){
+  if (!channel) return null;
+  const pool = state.history.filter(h => h.channel === channel && (!series || h.series === series) && (h.format||'long') === (format||'long') && h.id !== excludeId).map(derive);
+  if (pool.length < 3) return null;
+  const avg = {_n: pool.length, _word: series ? '시리즈 평균' : '채널 평균', _scope: series ? `같은 시리즈 ${pool.length}편` : `같은 채널 ${pool.length}편`};
+  for (const k of AVG_KEYS){
+    const xs = pool.map(p => p[k]).filter(x => x != null && isFinite(x));
+    avg[k] = xs.length >= 3 ? xs.reduce((a,b) => a+b, 0) / xs.length : null;
+  }
+  return avg;
+}
+
+const SINGLE = {
+  impressions:{good:['노출 확장','채널 평균보다 노출이 많음. 알고리즘이 이 주제를 더 넓게 보여주는 중'], bad:['노출 부족','채널 평균보다 노출이 적음. 게시 직후 첫 반응이 약했거나 주제 수요가 작은 가능성']},
+  views:{good:['조회 확장','채널 평균보다 많이 재생됨. 피드 추천이 이어지는 중'], bad:['조회 부족','채널 평균보다 재생이 적음. 첫 1~2초 장면과 주제 점검 필요']},
+  ctr:{good:['썸네일·제목 클릭 유도 성공','노출 대비 클릭이 높음. 이번 썸네일 문구 구조를 다음 영상에도 재사용할 가치'], bad:['클릭률 낮음','썸네일이 한눈에 "무엇을 얻는지" 보여주는지 점검. 문구 축소, 대비 강화, 제목과 역할 분담 권장']},
+  ret30:{good:['도입부 장악','첫 30초 이탈이 적음. 현재 도입 구성 유지 권장'], bad:['초반 이탈 많음','첫 30초 안에 영상의 핵심 약속 제시 필요. 긴 인사·채널 소개는 뒤로 이동']},
+  avp:{good:['끝까지 보는 영상','평균 조회율이 높음. 구성·템포가 시청자와 맞은 상태'], bad:['평균 조회율 낮음','시청 지속 그래프의 급락 구간 확인 후 해당 부분 압축·편집 점검']},
+  engRate:{good:['반응 활발','좋아요·댓글·공유 비율이 높음. 댓글에 답하며 대화 이어가기 권장'], bad:['반응 적음','영상 안에서 구체적인 질문 던지기, 고정 댓글로 대화 시작 권장']},
+  subsPer1k:{good:['구독 전환 우수','조회 대비 구독 증가가 많음. 채널 입문용 영상으로 재생목록 상단 배치 권장'], bad:['구독 전환 낮음','엔딩 화면·다음 편 예고로 채널의 다음 영상과 연결 필요']},
+};
+const SHORTS_SINGLE = {
+  ret30:{good:['첫 장면 훅 성공','넘기지 않고 보는 비율이 높음. 첫 1초 구성 유지 권장'], bad:['첫 장면에서 넘김','첫 1~2초에 결론·가장 강한 장면 배치 필요. 로고·인사 제거']},
+};
+
+function diagnose(d, avg){
+  const shorts = d.format === 'shorts';
+  const stages = stagesFor(d);
+  const S = {};
+  stages.forEach(st => { S[st.k] = judge(d[st.k], st.th, avg ? avg[st.k] : null); });
+  const is = (k, s) => S[k] && S[k].s === s;
+  const goods = [], issues = [], notes = [], used = new Set();
+
+  if (!shorts){
+    if (is('ctr','good') && is('ret30','bad')){ issues.push({t:'클릭 후 초반 이탈', b:'썸네일·제목이 끌어온 기대를 도입부가 바로 채우지 못한 상태로 판단. 썸네일에서 약속한 내용을 첫 15~30초 안에 제시 권장', k:'ret30'}); used.add('ret30'); }
+    if (is('ctr','bad') && (is('ret30','good') || is('avp','good'))){ issues.push({t:'내용 대비 포장 약함', b:'본 사람은 오래 보는데 클릭이 적은 상태. 썸네일 문구·제목 교체 테스트 가치 큼 (스튜디오 썸네일 테스트 기능 활용)', k:'ctr'}); used.add('ctr'); }
+    if (is('ctr','bad') && is('avp','bad') && !used.has('ctr')){ issues.push({t:'주제·포장 동시 약세', b:'클릭도 시청 유지도 낮은 상태. 썸네일보다 주제 선정 자체를 먼저 재점검 권장', k:'ctr'}); used.add('ctr'); used.add('avp'); }
+    if (is('impressions','bad') && (is('ctr','good') || is('ctr','ok'))){ issues.push({t:'노출 확장 부족', b:'클릭률은 버티는데 노출수가 채널 평균보다 적은 상태. 게시 직후 기존 구독자 반응, 게시 시간대, 주제 수요 점검 권장', k:'impressions'}); used.add('impressions'); }
+  }
+  if (is('ret30','good') && is('avp','bad')){ issues.push({t:'중반 이탈', b:'도입부는 붙잡았지만 중반 이후 이탈이 많은 상태. 시청 지속 그래프 급락 지점의 설명 압축·화면 전환·챕터 추가 권장', k:'avp'}); used.add('avp'); }
+  if ((is('avp','good') || is('ret30','good')) && is('subsPer1k','bad')){ issues.push({t:'시청이 구독으로 이어지지 않음', b:'끝까지 보고도 구독하지 않는 상태. 이 채널에서 다음에 무엇을 얻는지 알려주는 장치 부족. 엔딩에 다음 편 예고·재생목록 연결 권장', k:'subsPer1k'}); used.add('subsPer1k'); }
+  if (is('avp','good') && is('engRate','bad')){ issues.push({t:'조용한 시청', b:'오래 보지만 반응이 적은 상태. 영상 중 의견을 묻는 질문, 고정 댓글로 대화 시작 권장', k:'engRate'}); used.add('engRate'); }
+
+  stages.forEach(st => {
+    if (used.has(st.k)) return;
+    const txt = (shorts && SHORTS_SINGLE[st.k]) || SINGLE[st.k];
+    if (!txt) return;
+    if (is(st.k,'good')) goods.push({t:txt.good[0], b:txt.good[1], k:st.k});
+    if (is(st.k,'bad')) issues.push({t:txt.bad[0], b:txt.bad[1], k:st.k});
+  });
+  if (d.sharePer1k != null && d.sharePer1k >= 5) goods.push({t:'공유가 많은 영상', b:'조회 1천 회당 공유 '+f1(d.sharePer1k)+'회. 누군가에게 보내고 싶은 정보성 주제라는 신호', k:null});
+
+  const tr = [['tBrowse','탐색 기능(홈·구독 피드)'],['tSuggested','추천 동영상'],['tSearch','YouTube 검색']].filter(([k]) => d[k] != null);
+  if (tr.length){
+    const top = tr.slice().sort((a,b) => d[b[0]] - d[a[0]])[0];
+    const msg = {
+      tBrowse:'홈 화면 추천이 주력 유입. 썸네일 클릭률이 노출 확장을 좌우하는 구조',
+      tSuggested:'다른 영상 옆 추천이 주력 유입. 비슷한 주제 영상을 연달아 만들면 유입이 이어지는 구조',
+      tSearch:'검색이 주력 유입. 제목에 검색어를 유지하고 오래 찾히는 주제로 시리즈화할 가치',
+    }[top[0]];
+    notes.push({t:top[1]+' '+pct0(d[top[0]]), b:msg});
+    if (d.tSearch != null && d.tSearch < 5 && !shorts) notes.push({t:'검색 유입 거의 없음', b:'제목에 사람들이 실제 검색하는 단어가 들어가는지 점검'});
+  }
+
+  const neck = stages.find(st => is(st.k,'bad')) || null;
+  return {stages, S, goods, issues, notes, neck};
+}
+
+/* ---------- 상태 ---------- */
+const EXAMPLE = {channel:'예시 채널', series:'예시 시리즈', title:'예시: 금리 뉴스 읽는 법', url:'', format:'long', durationSec:742, impressions:18400, ctr:6.8, views:1520, avdSec:228, ret30:58, subs:9, likes:61, comments:12, shares:7, tBrowse:34, tSuggested:21, tSearch:18};
+const state = {cur:{...EXAMPLE}, isExample:true, editingId:null, history:[], parsed:[], pickIdx:-1, db:null, canWrite:false, filterCh:'', filterSe:'', delArm:null, cats:[], catArm:null, basis:'series', basisWord:'채널 평균'};
+
+/* ---------- 채널·시리즈 ---------- */
+function allChannels(){
+  const names = state.cats.map(c => c.name);
+  state.history.forEach(h => { if (h.channel && !names.includes(h.channel)) names.push(h.channel); });
+  if (state.cur.channel && !names.includes(state.cur.channel)) names.push(state.cur.channel);
+  return names;
+}
+function seriesOf(ch){
+  const c = state.cats.find(x => x.name === ch);
+  const list = c ? [...c.series] : [];
+  state.history.forEach(h => { if (h.channel === ch && h.series && !list.includes(h.series)) list.push(h.series); });
+  if (state.cur.channel === ch && state.cur.series && !list.includes(state.cur.series)) list.push(state.cur.series);
+  return list;
+}
+function renderCatSelects(){
+  const ch = state.cur.channel || '';
+  $('#f-channel').innerHTML = `<option value="">채널 선택</option>` + allChannels().map(c => `<option value="${esc(c)}"${c === ch ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  const ss = ch ? seriesOf(ch) : [];
+  $('#f-series').innerHTML = `<option value="">시리즈 없음</option>` + ss.map(s => `<option value="${esc(s)}"${s === state.cur.series ? ' selected' : ''}>${esc(s)}</option>`).join('');
+  $('#f-series').disabled = !ch;
+}
+const canEditCats = () => !state.db || state.canWrite;
+const countVideos = (ch, s) => state.history.filter(h => h.channel === ch && (s == null || h.series === s)).length;
+function renderCatManager(){
+  const el = $('#catList'), ed = canEditCats();
+  $('#newChannel').parentElement.hidden = !ed;
+  if (!state.cats.length){ el.innerHTML = `<p class="empty" style="margin:0">등록한 채널 없음.${ed ? ' 위 칸에 채널 이름을 넣고 "채널 추가"' : ''}</p>`; return; }
+  el.innerHTML = state.cats.map((c, ci) => {
+    const armC = state.catArm === 'c' + ci;
+    return `<div class="cat">
+    <div class="cat-head"><b>${esc(c.name)}</b><span class="row"><span class="cnt">${countVideos(c.name)}편</span>${ed ? `<button class="btn mini" data-delch="${ci}" type="button">${armC ? '삭제 확인' : '채널 삭제'}</button>` : ''}</span></div>
+    <div class="chips">${c.series.length ? c.series.map((s, si) => {
+      const arm = state.catArm === `s${ci}:${si}`;
+      return `<span class="schip">${esc(s)} <span class="cnt">${countVideos(c.name, s)}</span>${ed ? `<button type="button" data-delse="${ci}:${si}" class="${arm ? 'arm' : ''}" aria-label="${esc(s)} 시리즈 삭제">${arm ? '삭제' : '×'}</button>` : ''}</span>`;
+    }).join('') : '<span class="empty">시리즈 없음</span>'}</div>
+    ${ed ? `<div class="addrow"><input type="text" id="ns-${ci}" placeholder="새 시리즈 이름" autocomplete="off"><button class="btn mini" data-addse="${ci}" type="button">시리즈 추가</button></div>` : ''}
+  </div>`;
+  }).join('');
+}
+function refreshCats(){ renderCatManager(); renderCatSelects(); renderHistory(); }
+let catChain = Promise.resolve();
+function saveCats(next){
+  const prev = state.cats;
+  state.cats = next; refreshCats();
+  if (!state.db) return;
+  catChain = catChain.then(() => state.db.doc('meta/categories').set({channels: next})).catch(err => {
+    state.cats = prev; refreshCats();
+    showMsg('#catMsg', '변경 저장 실패: ' + (err.message || err.code), true);
+  });
+}
+const cloneCats = () => state.cats.map(c => ({name:c.name, series:[...c.series]}));
+function addChannel(){
+  const inp = $('#newChannel'), name = inp.value.trim();
+  if (!name) return;
+  if (state.cats.some(c => c.name === name)){ showMsg('#catMsg', `"${name}" 채널은 이미 있음`, true); return; }
+  const next = cloneCats(); next.push({name, series:[]});
+  inp.value = ''; $('#catMsg').hidden = true; saveCats(next);
+}
+function addSeries(ci){
+  const inp = $('#ns-' + ci), name = inp ? inp.value.trim() : '';
+  if (!name) return;
+  if (state.cats[ci].series.includes(name)){ showMsg('#catMsg', `"${name}" 시리즈는 이미 있음`, true); return; }
+  const next = cloneCats(); next[ci].series.push(name);
+  $('#catMsg').hidden = true; saveCats(next);
+  setTimeout(() => $('#ns-' + ci)?.focus(), 0);
+}
+$('#addChannelBtn').addEventListener('click', addChannel);
+$('#newChannel').addEventListener('keydown', e => { if (e.key === 'Enter') addChannel(); });
+$('#catList').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.id?.startsWith('ns-')) addSeries(+e.target.id.slice(3)); });
+$('#catList').addEventListener('click', e => {
+  const add = e.target.closest('[data-addse]');
+  if (add){ addSeries(+add.dataset.addse); return; }
+  const dc = e.target.closest('[data-delch]');
+  if (dc){
+    const ci = +dc.dataset.delch;
+    if (state.catArm !== 'c' + ci){ state.catArm = 'c' + ci; renderCatManager(); return; }
+    state.catArm = null; const next = cloneCats(); next.splice(ci, 1); saveCats(next); return;
+  }
+  const ds = e.target.closest('[data-delse]');
+  if (ds){
+    const [ci, si] = ds.dataset.delse.split(':').map(Number);
+    if (state.catArm !== `s${ci}:${si}`){ state.catArm = `s${ci}:${si}`; renderCatManager(); return; }
+    state.catArm = null; const next = cloneCats(); next[ci].series.splice(si, 1); saveCats(next);
+  }
+});
+
+/* ---------- 폼 ---------- */
+function buildForm(){
+  $('#metricFields').innerHTML = FORM.map(f => `<div><label for="f-${f.k}" id="lb-${f.k}">${esc(f.label)}</label><input type="text" inputmode="decimal" id="f-${f.k}" placeholder="${esc(f.ph)}" autocomplete="off"></div>`).join('');
+}
+function fillForm(v){
+  renderCatSelects();
+  $('#f-title').value = v.title || '';
+  $('#f-url').value = v.url || '';
+  FORM.forEach(f => { const x = v[f.k]; $('#f-'+f.k).value = x == null ? '' : (f.time ? fmtTime(x) : String(Math.round(x*100)/100)); });
+  setFormat(v.format || 'long', false);
+}
+function readForm(){
+  const v = {channel:$('#f-channel').value, series:$('#f-series').value, title:$('#f-title').value.trim(), url:$('#f-url').value.trim(), format:state.cur.format || 'long', published:state.cur.published || null};
+  FORM.forEach(f => { const raw = $('#f-'+f.k).value; const x = f.time ? parseTime(raw) : parseNum(raw); if (x != null) v[f.k] = x; });
+  v.videoId = videoIdFrom(v.url) || state.cur.videoId || null;
+  if (!v.url && v.videoId) v.url = 'https://youtu.be/' + v.videoId;
+  return v;
+}
+function setFormat(fmt, rerender = true){
+  state.cur.format = fmt;
+  $('#fmtLong').setAttribute('aria-pressed', fmt === 'long');
+  $('#fmtShorts').setAttribute('aria-pressed', fmt === 'shorts');
+  $('#lb-ret30').textContent = fmt === 'shorts' ? '계속 시청 비율 (%)' : '30초 시청 유지율 (%)';
+  $('#lb-impressions').parentElement.hidden = fmt === 'shorts';
+  $('#lb-ctr').parentElement.hidden = fmt === 'shorts';
+  $('#ret30Hint').textContent = fmt === 'shorts' ? "계속 시청 비율: 쇼츠 분석 → 개요의 '계속 시청함' 비율" : "30초 유지율: 영상별 분석 → 참여도 탭 '시청 지속 시간 주요 순간'의 0:30 시점 수치";
+  if (rerender) render();
+}
+let tmr;
+function onFormInput(){
+  clearTimeout(tmr);
+  tmr = setTimeout(() => { state.cur = readForm(); state.isExample = false; render(); }, 180);
+}
+
+/* ---------- 렌더 ---------- */
+function relHtml(rel){
+  if (rel == null) return '';
+  const p = Math.round(rel*100);
+  if (p === 0) return '<span class="delta">채널 평균과 같음</span>';
+  return `<span class="delta ${p>0?'up':'down'}">${state.basisWord} 대비 ${p>0?'▲':'▼'} ${Math.abs(p)}%</span>`;
+}
+function render(){
+  const d = derive(state.cur);
+  const chAvg = channelAvg(d.channel, d.format, state.editingId);
+  const seAvg = d.series ? channelAvg(d.channel, d.format, state.editingId, d.series) : null;
+  const avg = state.basis === 'series' && seAvg ? seAvg : chAvg;
+  state.basisWord = avg ? avg._word : '채널 평균';
+  const r = diagnose(d, avg);
+  const filled = r.stages.filter(st => d[st.k] != null).length;
+
+  // 요약
+  const bad = r.stages.filter(st => r.S[st.k].s === 'bad').length;
+  const good = r.stages.filter(st => r.S[st.k].s === 'good').length;
+  let head, body;
+  if (filled < 2){ head = '지표를 2개 이상 넣으면 진단 시작'; body = '왼쪽에 스튜디오 표를 붙여넣거나 숫자를 직접 입력'; }
+  else if (r.neck){
+    head = `병목: <em>${esc(r.neck.name)}</em> 단계`;
+    const firstIssue = r.issues.find(i => i.k === r.neck.k) || r.issues[0];
+    body = firstIssue ? esc(firstIssue.t) + ' — ' + esc(firstIssue.b) : '';
+  } else { head = `<em class="g">뚜렷한 병목 없음</em>`; body = '입력된 모든 단계가 보통 이상. 좋음 단계의 요소를 다음 영상에 반복 적용 권장'; }
+  const link = d.url ? ` · <a href="${esc(d.url)}" target="_blank" rel="noopener">영상 열기</a>` : '';
+  $('#verdict').innerHTML = `
+    <div class="meta">${state.isExample ? '<span class="tag ex">예시 데이터</span>' : ''}${state.editingId ? '<span class="tag">저장된 기록</span>' : ''}
+      <span>${esc(d.channel || '채널 미지정')}${d.series ? ' › ' + esc(d.series) : ''} · ${d.format === 'shorts' ? '쇼츠' : '롱폼'}${d.durationSec ? ' · ' + fmtTime(d.durationSec) : ''}${link}</span></div>
+    <div style="font-weight:600">${esc(d.title || '제목 없음')}</div>
+    <p class="vt">${head}</p>
+    <p>${body}</p>
+    <div class="meta"><span>좋음 ${good} · 개선 필요 ${bad} · 입력 ${filled}/${r.stages.length}단계</span><span>${avg ? `비교 기준: 일반 참고치 + ${avg._scope} 평균` : '비교 기준: 일반 참고치 (같은 채널·시리즈 3편 이상 저장 시 평균 반영)'}</span>
+      ${chAvg && seAvg ? `<span class="seg sm" role="group" aria-label="비교 평균"><button type="button" data-basis="channel" aria-pressed="${avg === chAvg}">채널 평균</button><button type="button" data-basis="series" aria-pressed="${avg === seAvg}">시리즈 평균</button></span>` : ''}</div>`;
+
+  // 깔때기
+  const fun = $('#funnel');
+  fun.className = 'funnel' + (r.stages.length === 5 ? ' n5' : '');
+  fun.innerHTML = r.stages.map((st, i) => {
+    const j = r.S[st.k], v = d[st.k];
+    let meter = '';
+    if (st.th && v != null){
+      const max = st.th[1] * 1.6;
+      const w = Math.max(2, Math.min(100, v / max * 100));
+      meter = `<div class="meter" aria-hidden="true"><div class="fill s-${j.s}" style="width:${w}%"></div><div class="tick" style="left:${st.th[0]/max*100}%"></div><div class="tick" style="left:${st.th[1]/max*100}%"></div></div>`;
+    }
+    const avgLine = !st.th && avg && avg[st.k] != null ? `<span class="ds">채널 평균 ${st.fmt(avg[st.k])}</span>` : '';
+    return `<div class="stage${r.neck && r.neck.k === st.k ? ' neck' : ''}">
+      ${r.neck && r.neck.k === st.k ? '<span class="neck-label">병목</span>' : ''}
+      <span class="step">${i+1} / ${r.stages.length}</span>
+      <span class="nm">${esc(st.name)}</span>
+      <span class="val">${st.fmt(v)}</span>
+      ${meter}
+      <span class="chip s-${j.s}">${S_LABEL[j.s]}</span>
+      ${relHtml(j.rel)}${avgLine}
+      <span class="ds">${esc(st.desc)}${st.th ? ` · 기준 ${st.th[0]} / ${st.th[1]}` : ''}</span>
+    </div>`;
+  }).join('');
+
+  const li = it => `<li><div><b>${esc(it.t)}${it.k && r.S[it.k] && r.S[it.k].rel != null ? relHtml(r.S[it.k].rel).replace('class="delta','class="rel') : ''}</b><span>${esc(it.b)}</span></div></li>`;
+  $('#goods').innerHTML = r.goods.length ? r.goods.map(li).join('') : '<li class="empty" style="display:block">아직 "좋음" 판정 단계 없음</li>';
+  $('#issues').innerHTML = r.issues.length ? r.issues.map(li).join('') : '<li class="empty" style="display:block">"개선 필요" 판정 단계 없음</li>';
+  $('#notesPanel').hidden = !r.notes.length;
+  $('#notes').innerHTML = r.notes.map(li).join('');
+
+  // 계산 지표
+  const rows = [
+    ['노출수', f0(d.impressions), 'impressions', f0],
+    ['노출 클릭률', pct1(d.ctr), 'ctr', pct1],
+    ['조회수', f0(d.views), 'views', f0],
+    ['평균 시청 지속 시간', d.avdSec != null ? fmtTime(d.avdSec) : '–', null],
+    ['평균 조회율', pct1(d.avp), 'avp', pct1],
+    [d.format === 'shorts' ? '계속 시청 비율' : '30초 유지율', pct0(d.ret30), 'ret30', pct0],
+    ['시청 시간', d.watchHours != null ? f1(d.watchHours) + '시간' : '–', 'watchHours', x => f1(x) + '시간'],
+    ['좋아요율', d.likeRate != null ? (Math.round(d.likeRate*100)/100) + '%' : '–', 'likeRate', x => (Math.round(x*100)/100) + '%'],
+    ['댓글 / 조회 1천', f1(d.commentPer1k), 'commentPer1k', f1],
+    ['공유 / 조회 1천', f1(d.sharePer1k), 'sharePer1k', f1],
+    ['반응률', pct1(d.engRate), 'engRate', pct1],
+    ['구독 / 조회 1천', f1(d.subsPer1k), 'subsPer1k', f1],
+  ].filter(rw => rw[1] !== '–' && rw[1] !== '–%');
+  const autoKeys = [];
+  if (state.cur.avp == null && d.avp != null) autoKeys.push('평균 조회율');
+  if (state.cur.watchHours == null && d.watchHours != null) autoKeys.push('시청 시간');
+  $('#calcTbl').innerHTML = `<thead><tr><th>지표</th><th>이 영상</th><th>${state.basisWord}</th><th>차이</th></tr></thead><tbody>` +
+    (rows.length ? rows.map(([n, val, k, fm]) => {
+      const a = avg && k ? avg[k] : null, raw = k ? d[k] : null;
+      const rel = a && raw != null ? raw / a - 1 : null;
+      return `<tr><td class="txt">${esc(n)}${autoKeys.includes(n) ? ' <span class="tag">자동 계산</span>' : ''}</td><td>${val}</td><td>${a != null ? fm(a) : '–'}</td><td>${rel != null ? `<span class="${rel>0?'up':rel<0?'down':''}">${rel>0?'▲':rel<0?'▼':''} ${Math.abs(Math.round(rel*100))}%</span>` : '–'}</td></tr>`;
+    }).join('') : '<tr><td class="txt" colspan="4">입력된 지표 없음</td></tr>') + '</tbody>';
+  $('#benchNote').textContent = '일반 참고치(보통/좋음 경계): 클릭률 3/6%, 30초 유지 60/70%, 평균 조회율은 길이별(5분 이하 40/55, 15분 이하 30/45, 그 이상 25/35%), 반응률 2.5/5%, 구독 1천 회당 1.5/4명. 채널 평균보다 15% 이상 높거나 낮으면 한 단계 보정. ▲ 빨강 = 평균보다 높음, ▼ 파랑 = 낮음';
+
+  renderHistory();
+}
+
+/* ---------- 기록 ---------- */
+function renderHistory(){
+  const chans = allChannels().filter(c => c !== '예시 채널' || state.history.some(h => h.channel === c));
+  if (state.filterCh && !chans.includes(state.filterCh)) state.filterCh = '';
+  const wantCh = state.filterCh;
+  $('#histFilter').innerHTML = `<option value="">전체</option>` + chans.map(c => `<option value="${esc(c)}"${c === wantCh ? ' selected' : ''}>${esc(c)}</option>`).join('');
+  const ss = wantCh ? seriesOf(wantCh) : [];
+  if (state.filterSe && state.filterSe !== '__none' && !ss.includes(state.filterSe)) state.filterSe = '';
+  const wantSe = state.filterSe;
+  $('#histSeries').innerHTML = `<option value="">전체</option>` + ss.map(s => `<option value="${esc(s)}"${s === wantSe ? ' selected' : ''}>${esc(s)}</option>`).join('') + (wantCh ? `<option value="__none"${wantSe === '__none' ? ' selected' : ''}>시리즈 미지정</option>` : '');
+  $('#histSeries').disabled = !wantCh;
+  const list = state.history.filter(h => (!wantCh || h.channel === wantCh) && (!wantSe || (wantSe === '__none' ? !h.series : h.series === wantSe)));
+  const tbl = $('#histTbl'), sum = $('#histSum');
+  sum.hidden = true;
+  if (!state.db){ tbl.innerHTML = '<tbody><tr><td class="txt">저장 기능을 쓸 수 없는 브라우저. 진단은 그대로 동작</td></tr></tbody>'; return; }
+  if (!list.length){ tbl.innerHTML = `<tbody><tr><td class="txt">${state.history.length ? '이 조건에 맞는 영상 없음' : '저장한 영상 없음. 왼쪽에서 지표 입력 후 "기록 저장"을 누르면 여기에 쌓이고, 같은 채널 3편부터 평균 비교 시작'}</td></tr></tbody>`; return; }
+  const rowsD = list.map(h => { const d = derive(h); return {h, d, r: diagnose(d, channelAvg(h.channel, h.format, h.id))}; });
+  const mean = k => { const xs = rowsD.map(x => x.d[k]).filter(x => x != null && isFinite(x)); return xs.length ? xs.reduce((a,b) => a+b, 0) / xs.length : null; };
+  const necks = {}; rowsD.forEach(x => { if (x.r.neck) necks[x.r.neck.name] = (necks[x.r.neck.name] || 0) + 1; });
+  const topNeck = Object.entries(necks).sort((a,b) => b[1] - a[1])[0];
+  const scope = wantCh ? esc(wantCh) + (wantSe ? ' › ' + (wantSe === '__none' ? '시리즈 미지정' : esc(wantSe)) : '') : '전체 채널';
+  sum.hidden = false;
+  sum.innerHTML = `<span>${scope} <b>${list.length}</b>편</span><span>평균 클릭률 <b>${pct1(mean('ctr'))}</b></span><span>초반 유지 <b>${pct0(mean('ret30'))}</b></span><span>조회율 <b>${pct1(mean('avp'))}</b></span><span>반응률 <b>${pct1(mean('engRate'))}</b></span><span>구독/1천 <b>${f1(mean('subsPer1k'))}</b></span><span>가장 잦은 병목 <b>${topNeck ? esc(topNeck[0]) + ' (' + topNeck[1] + '편)' : '없음'}</b></span>`;
+  tbl.innerHTML = `<thead><tr><th>제목</th><th>채널 › 시리즈</th><th>게시</th><th>노출</th><th>클릭률</th><th>초반 유지</th><th>조회율</th><th>반응률</th><th>구독/1천</th><th>병목</th><th></th></tr></thead><tbody>` +
+    rowsD.map(({h, d, r}) => {
+      return `<tr class="clickable${h.id === state.editingId ? ' cur' : ''}" data-id="${esc(h.id)}">
+        <td class="txt" title="${esc(h.title)}">${esc(h.title || '제목 없음')}${h.format === 'shorts' ? ' <span class="tag">쇼츠</span>' : ''}</td>
+        <td class="txt">${esc(h.channel || '–')}${h.series ? ' › ' + esc(h.series) : ''}</td><td class="txt">${esc(h.published || new Date(h.savedAt || 0).toLocaleDateString('ko-KR'))}</td>
+        <td>${f0(d.impressions)}</td><td>${pct1(d.ctr)}</td><td>${pct0(d.ret30)}</td><td>${pct1(d.avp)}</td><td>${pct1(d.engRate)}</td><td>${f1(d.subsPer1k)}</td>
+        <td class="txt">${r.neck ? `<span class="chip s-bad">${esc(r.neck.name)}</span>` : '<span class="chip s-good">없음</span>'}</td>
+        <td>${state.canWrite ? `<button class="btn mini" data-del="${esc(h.id)}" type="button">${state.delArm === h.id ? '삭제 확인' : '삭제'}</button>` : ''}</td></tr>`;
+    }).join('') + '</tbody>';
+}
+$('#histTbl').addEventListener('click', async e => {
+  const del = e.target.closest('[data-del]');
+  if (del){
+    e.stopPropagation();
+    const id = del.dataset.del;
+    if (state.delArm !== id){ state.delArm = id; renderHistory(); return; }
+    state.delArm = null;
+    try { await state.db.collection('videos').doc(id).delete(); if (state.editingId === id) state.editingId = null; }
+    catch (err){ showMsg('#saveMsg', '삭제 실패: ' + (err.message || err.code), true); }
+    return;
+  }
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  const h = state.history.find(x => x.id === tr.dataset.id);
+  if (!h) return;
+  state.cur = {...h}; state.editingId = h.id; state.isExample = false; state.delArm = null;
+  fillForm(state.cur); render();
+  window.scrollTo({top:0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+});
+$('#histFilter').addEventListener('change', e => { state.filterCh = e.target.value; state.filterSe = ''; renderHistory(); });
+$('#histSeries').addEventListener('change', e => { state.filterSe = e.target.value; renderHistory(); });
+$('#verdict').addEventListener('click', e => { const b = e.target.closest('[data-basis]'); if (b){ state.basis = b.dataset.basis; render(); } });
+
+function showMsg(sel, text, err){ const el = $(sel); el.hidden = false; el.className = 'msg' + (err ? ' err' : ''); el.textContent = text; }
+
+function toDoc(v){
+  const o = {channel:v.channel || '', series:v.series || '', title:v.title || '', url:v.url || '', videoId:v.videoId || null, format:v.format || 'long', published:v.published || null, savedAt:Date.now()};
+  NUM_KEYS.forEach(k => { if (v[k] != null && isFinite(v[k])) o[k] = v[k]; });
+  return o;
+}
+async function saveOne(v, id){
+  const col = state.db.collection('videos');
+  const ref = id ? col.doc(id) : (v.videoId ? col.doc(v.videoId) : col.doc());
+  await ref.set(toDoc(v));
+  return ref.id;
+}
+$('#saveBtn').addEventListener('click', async () => {
+  if (!state.db || !state.canWrite){ showMsg('#saveMsg', '이 보기에서는 저장 권한 없음', true); return; }
+  const v = readForm();
+  if (!v.channel){ showMsg('#saveMsg', '채널 선택 필요. 목록에 없으면 아래 "채널·시리즈 관리"에서 추가', true); $('#f-channel').focus(); return; }
+  const btn = $('#saveBtn'); btn.disabled = true;
+  try { state.editingId = await saveOne(v, state.editingId); state.cur = {...v, id:state.editingId}; state.isExample = false; showMsg('#saveMsg', '저장됨: ' + (v.title || '제목 없음')); render(); }
+  catch (err){ showMsg('#saveMsg', '저장 실패: ' + (err.code === 'quota_exceeded' ? '저장 공간 가득 참. 오래된 기록 삭제 필요' : (err.message || err.code)), true); }
+  finally { btn.disabled = false; }
+});
+$('#newBtn').addEventListener('click', () => {
+  state.cur = {channel:$('#f-channel').value, series:$('#f-series').value, format:state.cur.format || 'long'}; state.editingId = null; state.isExample = false;
+  fillForm(state.cur); render(); $('#f-title').focus();
+});
+
+/* ---------- 가져오기 ---------- */
+function applyImported(vids){
+  state.parsed = vids;
+  const pl = $('#pickList');
+  if (!vids.length){ showMsg('#importMsg', '지표를 찾지 못함. 첫 줄에 "조회수", "노출수" 같은 항목 이름이 있는지 확인', true); pl.hidden = true; $('#pickActions').hidden = true; return; }
+  showMsg('#importMsg', vids.length === 1 ? '영상 1편 인식. 아래 칸에 채움' : `영상 ${vids.length}편 인식. 진단할 영상 선택`);
+  pl.hidden = vids.length < 2;
+  $('#pickActions').hidden = !(state.db && state.canWrite);
+  pl.innerHTML = vids.map((v, i) => `<button type="button" data-i="${i}" aria-pressed="${i===0}"><span class="t">${esc(v.title || v.videoId || ('영상 ' + (i+1)))}</span><span class="n">${f0(v.views)}회</span></button>`).join('');
+  pick(0);
+}
+function pick(i){
+  const v = state.parsed[i]; if (!v) return;
+  state.pickIdx = i;
+  [...$('#pickList').children].forEach((b, j) => b.setAttribute('aria-pressed', j === i));
+  const base = {channel:$('#f-channel').value, series:$('#f-series').value, format: v.durationSec != null ? (v.durationSec <= 60 ? 'shorts' : 'long') : (state.cur.format || 'long')};
+  const merged = {...base, ...v};
+  if (v.videoId && !v.url) merged.url = 'https://youtu.be/' + v.videoId;
+  if (!v.title && !v.videoId){ merged.title = $('#f-title').value.trim(); merged.url = $('#f-url').value.trim(); }
+  const existing = merged.videoId && state.history.find(h => h.id === merged.videoId);
+  state.editingId = existing ? existing.id : null;
+  state.cur = merged; state.isExample = false;
+  fillForm(merged); render();
+}
+$('#pickList').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) pick(+b.dataset.i); });
+$('#importBtn').addEventListener('click', () => { const t = $('#pasteBox').value; if (!t.trim()){ showMsg('#importMsg', '붙여넣은 내용 없음', true); return; } applyImported(importText(t)); });
+$('#fileIn').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => { let t = String(rd.result); $('#pasteBox').value = t.slice(0, 20000); applyImported(importText(t)); };
+  rd.readAsText(f, 'utf-8');
+  e.target.value = '';
+});
+$('#saveAllBtn').addEventListener('click', async () => {
+  const ch = $('#f-channel').value, se = $('#f-series').value;
+  if (!ch){ showMsg('#importMsg', '먼저 아래 "채널" 칸에서 채널 선택 (시리즈도 고르면 함께 저장)', true); $('#f-channel').focus(); return; }
+  const btn = $('#saveAllBtn'); btn.disabled = true;
+  let ok = 0;
+  try {
+    for (const v of state.parsed){
+      const fmt = v.durationSec != null && v.durationSec <= 60 ? 'shorts' : 'long';
+      const full = {...v, channel:ch, series:se, format:fmt, url: v.url || (v.videoId ? 'https://youtu.be/' + v.videoId : '')};
+      const existing = full.videoId ? full.videoId : null;
+      await saveOne(full, existing); ok++;
+    }
+    showMsg('#importMsg', `${ok}편 저장 완료`);
+  } catch (err){ showMsg('#importMsg', `${ok}편 저장 후 실패: ` + (err.message || err.code), true); }
+  finally { btn.disabled = false; }
+});
+
+/* ---------- 브라우저 저장소 ---------- */
+// 기록은 이 브라우저(localStorage)에만 저장. 서버 전송 없음
+function makeLocalDb(){
+  const KEY = 'yt-diagnosis:v1';
+  let mem = {videos:{}, meta:{}}, persistent = true;
+  const load = () => {
+    try { const raw = localStorage.getItem(KEY); const p = raw ? JSON.parse(raw) : {}; mem = {videos:p.videos || {}, meta:p.meta || {}}; }
+    catch (e){ persistent = false; }
+  };
+  load();
+  const subs = [];
+  const notify = () => subs.forEach(f => f());
+  const flush = () => {
+    try { localStorage.setItem(KEY, JSON.stringify(mem)); }
+    catch (e){ persistent = false; notify(); throw {code:'quota_exceeded', message:'브라우저 저장 공간에 쓸 수 없음. 시크릿 창이거나 저장 공간이 가득 찬 상태'}; }
+    notify();
+  };
+  const copy = o => JSON.parse(JSON.stringify(o));
+  const genId = () => 'v' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const listSnap = () => ({docs: Object.entries(mem.videos).sort((a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0)).map(([id, d]) => ({id, data: () => d}))});
+  const videos = {
+    doc: id => { id = id || genId(); return {id, set: async d => { mem.videos[id] = copy(d); flush(); }, delete: async () => { delete mem.videos[id]; flush(); }}; },
+    orderBy(){ return this; }, limit(){ return this; },
+    onSnapshot(cb){ const f = () => cb(listSnap()); subs.push(f); f(); return () => {}; },
+  };
+  // 다른 탭에서 바뀐 기록 반영
+  window.addEventListener('storage', e => { if (e.key === KEY){ load(); notify(); } });
+  return {
+    persistent: () => persistent,
+    collection: () => videos,
+    doc: path => {
+      const k = path.split('/')[1];
+      return {
+        set: async d => { mem.meta[k] = copy(d); flush(); },
+        onSnapshot(cb){ const f = () => cb({exists: k in mem.meta, data: () => mem.meta[k]}); subs.push(f); f(); return () => {}; },
+      };
+    },
+    exportAll: () => ({app:'yt-diagnosis', version:1, exportedAt:new Date().toISOString(), videos:copy(mem.videos), categories:copy(mem.meta.categories?.channels || [])}),
+    importAll(data){
+      if (!data || data.app !== 'yt-diagnosis' || typeof data.videos !== 'object') throw {message:'이 사이트에서 내보낸 기록 파일이 아님'};
+      let n = 0;
+      for (const [id, v] of Object.entries(data.videos)){ if (v && typeof v === 'object'){ mem.videos[id] = copy(v); n++; } }
+      const cats = copy(mem.meta.categories?.channels || []);
+      for (const c of Array.isArray(data.categories) ? data.categories : []){
+        if (!c || typeof c.name !== 'string' || !c.name) continue;
+        let t = cats.find(x => x.name === c.name);
+        if (!t){ t = {name:c.name, series:[]}; cats.push(t); }
+        for (const s of Array.isArray(c.series) ? c.series : []) if (typeof s === 'string' && s && !t.series.includes(s)) t.series.push(s);
+      }
+      mem.meta.categories = {channels: cats};
+      flush();
+      return n;
+    },
+  };
+}
+
+$('#exportBtn').addEventListener('click', () => {
+  if (!state.db) return;
+  const data = state.db.exportAll();
+  const blob = new Blob([JSON.stringify(data, null, 1)], {type:'application/json'});
+  const a = document.createElement('a');
+  const dt = new Date(), ymd = dt.getFullYear() + String(dt.getMonth()+1).padStart(2,'0') + String(dt.getDate()).padStart(2,'0');
+  a.href = URL.createObjectURL(blob);
+  a.download = `영상진단-기록-${ymd}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  showMsg('#backupMsg', `영상 ${Object.keys(data.videos).length}편, 채널 ${data.categories.length}개 내보냄. 다른 기기에서 "기록 불러오기"로 옮기기 가능`);
+});
+$('#importJson').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f || !state.db) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try { const n = state.db.importAll(JSON.parse(String(rd.result))); showMsg('#backupMsg', `영상 ${n}편 불러옴. 같은 영상은 파일 내용으로 덮어씀`); }
+    catch (err){ showMsg('#backupMsg', '불러오기 실패: ' + (err.message || '파일 형식 확인 필요'), true); }
+  };
+  rd.readAsText(f, 'utf-8');
+  e.target.value = '';
+});
+
+/* ---------- 시작 ---------- */
+buildForm();
+['#f-title','#f-url'].forEach(s => $(s).addEventListener('input', onFormInput));
+$('#f-channel').addEventListener('change', () => { state.cur = {...readForm(), series:''}; state.isExample = false; renderCatSelects(); render(); });
+$('#f-series').addEventListener('change', () => { state.cur = readForm(); state.isExample = false; render(); });
+FORM.forEach(f => $('#f-'+f.k).addEventListener('input', onFormInput));
+$('#fmtLong').addEventListener('click', () => { setFormat('long'); state.isExample = false; });
+$('#fmtShorts').addEventListener('click', () => { setFormat('shorts'); state.isExample = false; });
+fillForm(state.cur);
+render();
+renderCatManager();
+
+{
+  const db = makeLocalDb();
+  state.db = db; state.canWrite = true;
+  const setStatus = () => {
+    $('#dbDot').classList.toggle('on', db.persistent());
+    $('#dbState').textContent = db.persistent() ? '이 브라우저에 저장 중' : '저장 불가 (시크릿 창 등) · 창을 닫으면 사라짐';
+  };
+  db.collection('videos').orderBy('savedAt','desc').limit(500).onSnapshot(snap => {
+    state.history = snap.docs.map(doc => ({id:doc.id, ...doc.data()}));
+    renderCatManager(); renderCatSelects(); render(); setStatus();
+  });
+  db.doc('meta/categories').onSnapshot(snap => {
+    const raw = snap.exists ? snap.data().channels : [];
+    state.cats = Array.isArray(raw) ? raw.filter(c => c && typeof c.name === 'string' && c.name).map(c => ({name:c.name, series:Array.isArray(c.series) ? c.series.filter(s => typeof s === 'string' && s) : []})) : [];
+    refreshCats();
+  });
+}
+})();
+</script>
+</body>
+</html>
